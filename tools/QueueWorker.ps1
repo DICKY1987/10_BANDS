@@ -106,6 +106,55 @@ function Heal-GitRepo([string]$repo) {
   }
 }
 
+function Test-GitBranchSafety {
+  param([array]$GitArgs)
+  # Detect patterns that create or push branches/refs starting with "rollback"
+  $argsStr = $GitArgs -join ' '
+  
+  # Pattern 1: git checkout -b rollback/...
+  if ($GitArgs -contains 'checkout' -and $GitArgs -contains '-b') {
+    $idx = [array]::IndexOf($GitArgs, '-b')
+    if ($idx -ge 0 -and ($idx + 1) -lt $GitArgs.Count) {
+      $branchName = $GitArgs[$idx + 1]
+      if ($branchName -match '^rollback/') {
+        return @{ Safe = $false; Reason = "Branch creation with name starting with 'rollback/' is not allowed: $branchName" }
+      }
+    }
+  }
+  
+  # Pattern 2: git branch rollback/...
+  if ($GitArgs -contains 'branch' -and $GitArgs.Count -ge 2) {
+    $idx = [array]::IndexOf($GitArgs, 'branch')
+    if ($idx -ge 0 -and ($idx + 1) -lt $GitArgs.Count) {
+      $branchName = $GitArgs[$idx + 1]
+      # Exclude branch with flags like -d, -D, -m, etc.
+      if (-not $branchName.StartsWith('-') -and $branchName -match '^rollback/') {
+        return @{ Safe = $false; Reason = "Branch creation with name starting with 'rollback/' is not allowed: $branchName" }
+      }
+    }
+  }
+  
+  # Pattern 3: git push origin rollback/... or git push origin HEAD:refs/heads/rollback/...
+  if ($GitArgs -contains 'push') {
+    foreach ($arg in $GitArgs) {
+      # Check for direct branch push: rollback/...
+      if ($arg -match '^rollback/') {
+        return @{ Safe = $false; Reason = "Push to branch starting with 'rollback/' is not allowed: $arg" }
+      }
+      # Check for refspec push: HEAD:refs/heads/rollback/... or similar patterns
+      if ($arg -match ':refs/heads/rollback/' -or $arg -match ':refs/remotes/.*/rollback/') {
+        return @{ Safe = $false; Reason = "Push to ref starting with 'rollback/' is not allowed: $arg" }
+      }
+      # Check for direct ref push: refs/heads/rollback/...
+      if ($arg -match '^refs/heads/rollback/' -or $arg -match '^refs/remotes/.*/rollback/') {
+        return @{ Safe = $false; Reason = "Push to ref starting with 'rollback/' is not allowed: $arg" }
+      }
+    }
+  }
+  
+  return @{ Safe = $true; Reason = "" }
+}
+
 # Tool command builders
 function Build-Command {
   param(
@@ -149,6 +198,11 @@ function Build-Command {
       $exe = "git"
       $argv = @()
       $argv += $args
+      # Validate git branch safety
+      $safety = Test-GitBranchSafety -GitArgs $argv
+      if (-not $safety.Safe) {
+        throw "SECURITY: $($safety.Reason)"
+      }
       return ,@($exe, $argv)
     }
     default {
@@ -221,7 +275,16 @@ while ($true) {
       $promptFile = Join-Path $promptDir ("prompt_{0}.txt" -f $task.id)
       [IO.File]::WriteAllText($promptFile, [string]$task.prompt, [Text.UTF8Encoding]::new($true))
     }
-    $exe,$argv = Build-Command -Task $task -PromptFile $promptFile
+    
+    try {
+      $exe,$argv = Build-Command -Task $task -PromptFile $promptFile
+    } catch {
+      Write-Log "Task $($task.id) rejected: $_" "ERROR" $task.id
+      Write-Ledger @{ ts=(Get-Date).ToString('o'); id=$task.id; tool=$task.tool; attempt=0; exit=403; ok=$false; note=$_.Exception.Message }
+      Move-Item $work (Join-Path $failed $file.Name) -Force
+      $allOk=$false; break
+    }
+    
     $taskLog = Join-Path $LogsDir ("task_{0}.log" -f $task.id)
 
     $runner = {

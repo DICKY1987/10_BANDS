@@ -1,0 +1,15 @@
+# Task directories
+.tasks/
+10_bands/.tasks/
+
+# State directories
+.state/
+10_bands/.state/
+
+# Log directories
+logs/
+10_bands/logs/
+
+# Temporary files
+*.tmp
+*.temp
