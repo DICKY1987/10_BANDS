@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "10_BANDS Task",
+  "type": "object",
+  "required": ["id","tool","args"],
+  "properties": {
+    "id": { "type": "string" },
+    "tool": { "type": "string" },
+    "args": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}
