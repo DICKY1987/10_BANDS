@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import os, sys, json, subprocess, shutil
+import os, sys, json, subprocess, shutil, time
 from datetime import datetime, timezone
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 APP_TITLE = "Headless Queue Manager (v2)"
-DEFAULT_REPO = r"C:\Users\Richard Wilks\CLI_RESTART"
+
+# Derive a sensible default repo path (two levels up from this file)
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_REPO = os.path.abspath(os.path.join(_THIS_DIR, "..", ".."))
+
+# Path roots (may be overridden by SharedConfig.psd1 Paths section)
 DEF_TASKS = ".tasks"
 DEF_LOGS = "logs"
 STATE_DIR = ".state"
@@ -71,8 +76,96 @@ def color_for_line(line: str) -> str:
     return "#cccccc"
 
 
+def get_tool_names_from_config(repo_path: str) -> list[str]:
+    config_path = os.path.join(repo_path, "Config", "CliToolsConfig.psd1")
+    if not os.path.exists(config_path):
+        return []
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        # This is a simplified parser for .psd1 files. It's not a full-fledged
+        # PowerShell parser, but it's good enough for this specific file format.
+        import re
+        tool_names = re.findall(r"Name\s*=\s*\'(.*?)\'", content)
+        return tool_names
+    except Exception:
+        return []
+
+
+def _which(exe: str) -> str | None:
+    try:
+        return shutil.which(exe)
+    except Exception:
+        return None
+
+
+def _read_shared_paths_from_ps(repo_path: str) -> dict | None:
+    """Attempt to import SharedConfig.psd1 via PowerShell and return Paths as dict.
+
+    Prefers pwsh, falls back to Windows powershell if available.
+    """
+    psd1 = os.path.join(repo_path, "SharedConfig.psd1")
+    if not os.path.exists(psd1):
+        return None
+    pwsh = _which("pwsh")
+    ps5 = _which("powershell")
+    shell = pwsh or ps5
+    if not shell:
+        return None
+    cmd = [
+        shell,
+        "-NoProfile",
+        "-Command",
+        f"$x=Import-PowerShellDataFile -Path '{psd1}'; $x.Paths | ConvertTo-Json -Compress",
+    ]
+    try:
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+        data = json.loads(out.decode("utf-8", "ignore"))
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        return None
+    return None
+
+
+def _read_shared_paths_fallback(repo_path: str) -> dict | None:
+    """Very small regex-based parser for the Paths block in SharedConfig.psd1.
+
+    Handles single-quoted string values for TasksRoot/LogsRoot/StateRoot.
+    """
+    psd1 = os.path.join(repo_path, "SharedConfig.psd1")
+    if not os.path.exists(psd1):
+        return None
+    try:
+        txt = open(psd1, "r", encoding="utf-8").read()
+    except Exception:
+        return None
+    import re
+    paths_block = {}
+    for key in ("TasksRoot", "LogsRoot", "StateRoot"):
+        m = re.search(rf"{key}\s*=\s*'([^']+)'", txt)
+        if m:
+            paths_block[key] = m.group(1)
+    return paths_block or None
+
+
+def get_shared_paths(repo_path: str) -> dict:
+    """Return a dict with TasksRoot/LogsRoot/StateRoot resolved to absolute paths."""
+    paths = _read_shared_paths_from_ps(repo_path) or _read_shared_paths_fallback(repo_path) or {}
+    tasks = paths.get("TasksRoot", DEF_TASKS)
+    logs = paths.get("LogsRoot", DEF_LOGS)
+    state = paths.get("StateRoot", STATE_DIR)
+    # Resolve relative to repo root if needed
+    if not os.path.isabs(tasks):
+        tasks = os.path.join(repo_path, tasks)
+    if not os.path.isabs(logs):
+        logs = os.path.join(repo_path, logs)
+    if not os.path.isabs(state):
+        state = os.path.join(repo_path, state)
+    return {"TasksRoot": tasks, "LogsRoot": logs, "StateRoot": state}
+
 class AddTaskDialog(QtWidgets.QDialog):
-    def __init__(self, repo_path: str, seed: dict | None = None, parent=None):
+    def __init__(self, repo_path: str, tool_names: list[str], seed: dict | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Add Task (JSONL)")
         self.setModal(True)
@@ -80,7 +173,7 @@ class AddTaskDialog(QtWidgets.QDialog):
         layout = QtWidgets.QFormLayout(self)
 
         self.tool = QtWidgets.QComboBox()
-        self.tool.addItems(["git", "aider", "codex", "claude", "pwsh", "python"])
+        self.tool.addItems(tool_names)
         self.repo = QtWidgets.QLineEdit(repo_path)
         self.args = QtWidgets.QLineEdit()
         self.flags = QtWidgets.QLineEdit()
@@ -198,6 +291,8 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle(APP_TITLE)
         self.resize(1320, 860)
+        self._lastStopAt = 0.0
+        self._cooldownSec = 3
 
         # === Top paths & control ===
         self.repoEdit = QtWidgets.QLineEdit(DEFAULT_REPO)
@@ -215,12 +310,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btnRetryFailed = QtWidgets.QPushButton("Retry Failed → Inbox")
         self.btnOpenTasks = QtWidgets.QPushButton("Open .tasks")
         self.btnOpenLogs = QtWidgets.QPushButton("Open logs")
+        # Extra controls (clear log, refresh views)
+        self.btnClearLog = QtWidgets.QPushButton("Clear Log")
+        self.btnRefreshLedger = QtWidgets.QPushButton("Refresh Ledger")
+        self.btnRefreshDLQ = QtWidgets.QPushButton("Refresh DLQ")
+        self.btnRefreshCB = QtWidgets.QPushButton("Refresh CB")
+        self.btnForceCloseCB = QtWidgets.QPushButton("Force Close CB")
+        self.btnRetrySelectedDLQ = QtWidgets.QPushButton("Retry Selected")
+        self.btnDeleteSelectedDLQ = QtWidgets.QPushButton("Delete Selected")
         self.btnStart.clicked.connect(self.start_worker)
         self.btnStop.clicked.connect(self.stop_worker)
         self.btnAdd.clicked.connect(self.add_task)
         self.btnRetryFailed.clicked.connect(self.retry_failed)
         self.btnOpenTasks.clicked.connect(lambda: self.open_folder(self.tasks_dir()))
         self.btnOpenLogs.clicked.connect(lambda: self.open_folder(self.logs_dir()))
+        self.btnClearLog.clicked.connect(lambda: (hasattr(self, 'liveLog') and self.liveLog.clear()))
+        self.btnRefreshLedger.clicked.connect(self.load_ledger)
+        self.btnRefreshDLQ.clicked.connect(self.refresh_dlq)
+        self.btnRefreshCB.clicked.connect(self.refresh_breakers)
+        self.btnForceCloseCB.clicked.connect(self.force_close_breaker)
+        self.btnRetrySelectedDLQ.clicked.connect(self.retry_selected_dlq)
+        self.btnDeleteSelectedDLQ.clicked.connect(self.delete_selected_dlq)
 
         # Filters
         self.filterTool = QtWidgets.QComboBox()
@@ -241,132 +351,29 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btnEditTemplate.clicked.connect(self.open_template_in_dialog)
         self.btnLoadTemplates.clicked.connect(self.load_templates_from_disk)
 
-        top = QtWidgets.QWidget()
-        g = QtWidgets.QGridLayout(top)
-        r = 0
-        g.addWidget(QtWidgets.QLabel("Repo"), r, 0)
-        g.addWidget(self.repoEdit, r, 1)
-        g.addWidget(self.btnRepo, r, 2)
-        r += 1
-        g.addWidget(QtWidgets.QLabel(".tasks"), r, 0)
-        g.addWidget(self.tasksEdit, r, 1)
-        g.addWidget(self.btnTasks, r, 2)
-        r += 1
-        g.addWidget(QtWidgets.QLabel("logs"), r, 0)
-        g.addWidget(self.logsEdit, r, 1)
-        g.addWidget(self.btnLogs, r, 2)
-        r += 1
-
-        bar = QtWidgets.QWidget()
-        hb = QtWidgets.QHBoxLayout(bar)
-        hb.addWidget(self.btnStart)
-        hb.addWidget(self.btnStop)
-        hb.addSpacing(15)
-        hb.addWidget(self.btnAdd)
-        hb.addWidget(self.btnRetryFailed)
-        hb.addStretch(1)
-        hb.addWidget(self.btnOpenTasks)
-        hb.addWidget(self.btnOpenLogs)
-        hb.addSpacing(20)
-        hb.addWidget(QtWidgets.QLabel("Filter:"))
-        hb.addWidget(self.filterTool)
-        hb.addWidget(self.filterText)
-
-        tbar = QtWidgets.QWidget()
-        tb = QtWidgets.QHBoxLayout(tbar)
-        tb.addWidget(QtWidgets.QLabel("Templates:"))
-        tb.addWidget(self.templatePicker, 2)
-        tb.addWidget(self.btnEnqueueTemplate)
-        tb.addWidget(self.btnEditTemplate)
-        tb.addStretch(1)
-        tb.addWidget(self.btnLoadTemplates)
-
-        # === Center: tabs ===
-        self.liveLog = QtWidgets.QTextEdit()
-        self.liveLog.setReadOnly(True)
-        self.liveLog.setLineWrapMode(QtWidgets.QTextEdit.LineWrapMode.NoWrap)
-
-        # Errors/ledger tab remains as before
-        self.errorsList = QtWidgets.QListWidget()
-        self.errorsList.itemDoubleClicked.connect(self.open_selected_log)
-        self.ledgerList = QtWidgets.QListWidget()
-        self.refreshLedgerBtn = QtWidgets.QPushButton("Refresh Ledger")
-        self.refreshLedgerBtn.clicked.connect(self.load_ledger)
-        leftTabs = QtWidgets.QTabWidget()
-        pageLog = QtWidgets.QWidget()
-        vv = QtWidgets.QVBoxLayout(pageLog)
-        vv.addWidget(self.liveLog)
-        leftTabs.addTab(pageLog, "Live Log")
-
-        # Right panel: Errors, Ledger, DLQ, Quarantine
-        rightTabs = QtWidgets.QTabWidget()
-        errorsTab = QtWidgets.QWidget()
-        v1 = QtWidgets.QVBoxLayout(errorsTab)
-        v1.addWidget(QtWidgets.QLabel("Recent errors (double‑click to open folder):"))
-        v1.addWidget(self.errorsList)
-        rightTabs.addTab(errorsTab, "Errors")
-
-        ledgerTab = QtWidgets.QWidget()
-        v2 = QtWidgets.QVBoxLayout(ledgerTab)
-        v2.addWidget(self.refreshLedgerBtn)
-        v2.addWidget(self.ledgerList)
-        rightTabs.addTab(ledgerTab, "Ledger")
-
-        # DLQ tab (failed + quarantine)
-        self.failedList = QtWidgets.QListWidget()
-        self.quarantineList = QtWidgets.QListWidget()
-        self.btnDLQRefresh = QtWidgets.QPushButton("Refresh")
-        self.btnDLQRetry = QtWidgets.QPushButton("Retry Selected")
-        self.btnDLQDelete = QtWidgets.QPushButton("Delete Selected")
-        self.btnDLQRefresh.clicked.connect(self.refresh_dlq)
-        self.btnDLQRetry.clicked.connect(self.retry_selected_dlq)
-        self.btnDLQDelete.clicked.connect(self.delete_selected_dlq)
-        dlqTab = QtWidgets.QWidget()
-        v3 = QtWidgets.QVBoxLayout(dlqTab)
-        hdlq = QtWidgets.QHBoxLayout()
-        hdlq.addWidget(QtWidgets.QLabel("failed/"))
-        hdlq.addStretch(1)
-        hdlq.addWidget(QtWidgets.QLabel("quarantine/"))
-        lists = QtWidgets.QHBoxLayout()
-        lists.addWidget(self.failedList)
-        lists.addWidget(self.quarantineList)
-        v3.addLayout(hdlq)
-        v3.addLayout(lists)
-        hbtn = QtWidgets.QHBoxLayout()
-        hbtn.addWidget(self.btnDLQRefresh)
-        hbtn.addStretch(1)
-        hbtn.addWidget(self.btnDLQRetry)
-        hbtn.addWidget(self.btnDLQDelete)
-        v3.addLayout(hbtn)
-        rightTabs.addTab(dlqTab, "DLQ")
-
-        # Quarantine breakers tab (view/force-close)
-        self.breakerView = QtWidgets.QTableWidget(0, 4)
-        self.breakerView.setHorizontalHeaderLabels(["Tool", "State", "Fails", "Until"])
-        self.breakerView.horizontalHeader().setStretchLastSection(True)
-        self.btnCBRefresh = QtWidgets.QPushButton("Refresh")
-        self.btnCBForceClose = QtWidgets.QPushButton("Force Close Selected")
-        self.btnCBRefresh.clicked.connect(self.refresh_breakers)
-        self.btnCBForceClose.clicked.connect(self.force_close_breaker)
-        qTab = QtWidgets.QWidget()
-        v4 = QtWidgets.QVBoxLayout(qTab)
-        v4.addWidget(self.btnCBRefresh)
-        v4.addWidget(self.breakerView)
-        v4.addWidget(self.btnCBForceClose)
-        rightTabs.addTab(qTab, "Quarantine")
-
-        splitter = QtWidgets.QSplitter()
-        splitter.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        splitter.addWidget(leftTabs)
-        splitter.addWidget(rightTabs)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
+        controls = QtWidgets.QWidget()
+        h = QtWidgets.QHBoxLayout(controls)
+        h.addWidget(self.btnStart)
+        h.addWidget(self.btnStop)
+        h.addSpacing(20)
+        h.addWidget(self.btnAdd)
+        h.addWidget(self.btnRetryFailed)
+        h.addStretch(1)
+        h.addWidget(self.btnOpenTasks)
+        h.addWidget(self.btnOpenLogs)
+        h.addWidget(self.btnClearLog)
+        h.addWidget(self.btnRefreshLedger)
+        h.addWidget(self.btnRefreshDLQ)
+        h.addWidget(self.btnRefreshCB)
+        h.addWidget(self.btnForceCloseCB)
+        h.addWidget(self.btnRetrySelectedDLQ)
+        h.addWidget(self.btnDeleteSelectedDLQ)
 
         # Central layout
         central = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(central)
         layout.addWidget(top)
-        layout.addWidget(bar)
+        layout.addWidget(controls)
         layout.addWidget(tbar)
         layout.addWidget(splitter)
         self.setCentralWidget(central)
@@ -388,6 +395,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hbTimer.start()
         # Try load templates from default Config path
         self.try_load_default_templates()
+        # Limit live log memory; wire error list double-click to open file
+        if hasattr(self, 'liveLog') and hasattr(self.liveLog, 'document'):
+            try:
+                self.liveLog.document().setMaximumBlockCount(10000)
+            except Exception:
+                pass
+        if hasattr(self, 'errorsList'):
+            try:
+                self.errorsList.itemDoubleClicked.connect(lambda _it: self.open_selected_log())
+            except Exception:
+                pass
 
     # ===== Paths/helpers =====
     def repo_dir(self) -> str:
@@ -396,21 +414,27 @@ class MainWindow(QtWidgets.QMainWindow):
     def tasks_dir(self) -> str:
         p = self.tasksEdit.text().strip()
         if not p:
-            p = os.path.join(self.repo_dir(), DEF_TASKS)
+            p = get_shared_paths(self.repo_dir())["TasksRoot"]
         return p
 
     def logs_dir(self) -> str:
         p = self.logsEdit.text().strip()
         if not p:
-            p = os.path.join(self.repo_dir(), DEF_LOGS)
+            p = get_shared_paths(self.repo_dir())["LogsRoot"]
         return p
 
     def state_dir(self) -> str:
-        return os.path.join(self.repo_dir(), STATE_DIR)
+        return get_shared_paths(self.repo_dir())["StateRoot"]
 
     def update_default_paths(self):
-        self.tasksEdit.setPlaceholderText(os.path.join(self.repo_dir(), DEF_TASKS))
-        self.logsEdit.setPlaceholderText(os.path.join(self.repo_dir(), DEF_LOGS))
+        roots = get_shared_paths(self.repo_dir())
+        self.tasksEdit.setPlaceholderText(roots["TasksRoot"])
+        self.logsEdit.setPlaceholderText(roots["LogsRoot"])
+        # Populate from SharedConfig when fields are empty
+        if not self.tasksEdit.text().strip():
+            self.tasksEdit.setText(roots["TasksRoot"])
+        if not self.logsEdit.text().strip():
+            self.logsEdit.setText(roots["LogsRoot"])
         for p in [self.tasks_dir(), self.logs_dir(), self.state_dir()]:
             os.makedirs(p, exist_ok=True)
         self.tailer.path = os.path.join(self.logs_dir(), "queueworker.log")
@@ -440,16 +464,32 @@ class MainWindow(QtWidgets.QMainWindow):
         if not os.path.exists(sup):
             QtWidgets.QMessageBox.warning(self, "Missing", f"Supervisor not found:\n{sup}")
             return
+        # Ensure directories exist based on SharedConfig
+        self.update_default_paths()
+        # Simple cooldown after stopping
+        if hasattr(self, '_lastStopAt') and hasattr(self, '_cooldownSec'):
+            if (time.time() - float(getattr(self, '_lastStopAt', 0) or 0)) < float(getattr(self, '_cooldownSec', 3)):
+                QtWidgets.QMessageBox.information(self, "Cooldown", "Please wait a few seconds before starting again.")
+                return
         try:
-            if os.name == "nt":
-                cmd = f'powershell -NoProfile -ExecutionPolicy Bypass -File "{sup}"'
+            pwsh = _which("pwsh")
+            ps5 = _which("powershell")
+            if pwsh:
+                subprocess.Popen([pwsh, "-NoProfile", "-File", sup])
+            elif os.name == "nt" and ps5:
+                cmd = f'"{ps5}" -NoProfile -ExecutionPolicy Bypass -File "{sup}"'
                 subprocess.Popen(
                     cmd,
                     shell=True,
                     creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
                 )
             else:
-                subprocess.Popen(["pwsh", "-NoProfile", "-File", sup])
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "PowerShell Missing",
+                    "PowerShell 7+ (pwsh) not found. Install from https://aka.ms/powershell",
+                )
+                return
             self.lblStatus.setText("Worker: starting…")
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", str(e))
@@ -460,6 +500,11 @@ class MainWindow(QtWidgets.QMainWindow):
             with open(stopfile, "w", encoding="utf-8") as f:
                 f.write("stop")
             self.lblStatus.setText("Stop requested")
+            # Record stop time for cooldown
+            try:
+                self._lastStopAt = time.time()
+            except Exception:
+                pass
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", str(e))
 
@@ -490,7 +535,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         task = dict(task)
         task.setdefault("repo", self.repo_dir())
-        dlg = AddTaskDialog(self.repo_dir(), seed=task, parent=self)
+        tool_names = get_tool_names_from_config(self.repo_dir())
+        dlg = AddTaskDialog(self.repo_dir(), tool_names, seed=task, parent=self)
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             self.enqueue_task_dict(dlg.build_task())
 
@@ -509,7 +555,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # ===== Task enqueue & retry =====
     def add_task(self):
-        dlg = AddTaskDialog(self.repo_dir(), parent=self)
+        tool_names = get_tool_names_from_config(self.repo_dir())
+        dlg = AddTaskDialog(self.repo_dir(), tool_names, parent=self)
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             self.enqueue_task_dict(dlg.build_task())
 
@@ -565,6 +612,15 @@ class MainWindow(QtWidgets.QMainWindow):
                         widget.addItem(it)
 
     def delete_selected_dlq(self):
+        # Confirmation
+        resp = QtWidgets.QMessageBox.question(
+            self,
+            "Confirm Delete",
+            "Delete selected failed/quarantined tasks? This cannot be undone.",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+        )
+        if resp != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
         total = 0
         for lst in (self.failedList, self.quarantineList):
             for it in lst.selectedItems():
@@ -718,19 +774,53 @@ class MainWindow(QtWidgets.QMainWindow):
         hb = os.path.join(self.state_dir(), "heartbeat.json")
         if not os.path.exists(hb):
             self.lblStatus.setText("No heartbeat")
+            # Update buttons when not running (respect a short cooldown)
+            cd = False
+            try:
+                cd = (time.time() - float(getattr(self, '_lastStopAt', 0) or 0)) < float(getattr(self, '_cooldownSec', 3))
+            except Exception:
+                cd = False
+            try:
+                self.btnStart.setEnabled(not cd)
+                self.btnStop.setEnabled(False)
+                self.btnStart.setToolTip("" if not cd else "Cooldown active")
+            except Exception:
+                pass
             return
         try:
             data = json.load(open(hb, "r", encoding="utf-8"))
             ts_raw = data.get("timestamp", "")
             if not ts_raw:
                 self.lblStatus.setText("Heartbeat: unreadable")
+                try:
+                    self.btnStart.setEnabled(True)
+                    self.btnStop.setEnabled(False)
+                except Exception:
+                    pass
                 return
             ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
             age = (datetime.now(timezone.utc) - ts.astimezone(timezone.utc)).total_seconds()
             pid = data.get("pid", "?")
             self.lblStatus.setText(f"Heartbeat: {int(age)}s ago  |  PID {pid}")
+            # Toggle buttons based on running state
+            running = age <= 5
+            try:
+                if running:
+                    self.btnStart.setEnabled(False)
+                    self.btnStop.setEnabled(True)
+                else:
+                    cd = (time.time() - float(getattr(self, '_lastStopAt', 0) or 0)) < float(getattr(self, '_cooldownSec', 3))
+                    self.btnStart.setEnabled(not cd)
+                    self.btnStop.setEnabled(False)
+            except Exception:
+                pass
         except Exception:
             self.lblStatus.setText("Heartbeat: unreadable")
+            try:
+                self.btnStart.setEnabled(True)
+                self.btnStop.setEnabled(False)
+            except Exception:
+                pass
 
     # ===== Misc helpers =====
     def open_folder(self, path: str):
