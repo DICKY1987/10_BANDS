@@ -1,0 +1,19 @@
+name: security-scan
+
+on:
+  push:
+    branches:
+      - main
+      - 'phase-*'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: TruffleHog scan (simple)
+        run: |
+          echo "Scan placeholder - add a secret scanning action or CodeQL as needed"
