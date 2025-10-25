@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CliToolsConfig",
+  "type": "object",
+  "required": ["QueuePath","WorkerCount","Tools"],
+  "properties": {
+    "QueuePath": { "type": "string" },
+    "WorkerCount": { "type": "integer", "minimum": 1 },
+    "LogPath": { "type": "string" },
+    "LogLevel": { "type": "string" },
+    "Tools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["Name","Path"],
+        "properties": {
+          "Name": { "type": "string" },
+          "Path": { "type": "string" },
+          "ArgsTemplate": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
