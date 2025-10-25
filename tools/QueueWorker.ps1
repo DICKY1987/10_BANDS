@@ -109,7 +109,6 @@ function Heal-GitRepo([string]$repo) {
 function Test-GitBranchSafety {
   param([array]$GitArgs)
   # Detect patterns that create or push branches/refs starting with "rollback"
-  $argsStr = $GitArgs -join ' '
   
   # Pattern 1: git checkout -b rollback/...
   if ($GitArgs -contains 'checkout' -and $GitArgs -contains '-b') {
