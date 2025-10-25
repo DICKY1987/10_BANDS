@@ -1,0 +1,22 @@
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-include = ["*.py", "scripts/**/*.py"]
+exclude = ["venv", ".venv", "dist", "build"]
+
+lint.select = ["E","F","I","UP","B","N","ANN","ARG"]
+lint.ignore = []
+lint.fixable = ["ALL"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cli_restart"]
+
+[tool.ruff.format]
+quote-style = "preserve"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-q --maxfail=1"
+testpaths = ["tests"]

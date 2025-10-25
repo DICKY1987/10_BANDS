@@ -1,0 +1,668 @@
+1 file already formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> QueueManagerGUI_v2.py:2:1
+  |
+1 |   #!/usr/bin/env python3
+2 | / from __future__ import annotations
+3 | | import os, sys, json, subprocess, shutil
+4 | | from datetime import datetime, timezone
+5 | | from PyQt6 import QtCore, QtGui, QtWidgets
+  | |__________________________________________^
+6 |
+7 |   APP_TITLE = "Headless Queue Manager (v2)"
+  |
+help: Organize imports
+
+E401 [*] Multiple imports on one line
+ --> QueueManagerGUI_v2.py:3:1
+  |
+1 | #!/usr/bin/env python3
+2 | from __future__ import annotations
+3 | import os, sys, json, subprocess, shutil
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | from datetime import datetime, timezone
+5 | from PyQt6 import QtCore, QtGui, QtWidgets
+  |
+help: Split imports
+
+ANN204 Missing return type annotation for special method `__init__`
+  --> QueueManagerGUI_v2.py:20:9
+   |
+18 |     new_lines = QtCore.pyqtSignal(list)
+19 |
+20 |     def __init__(self, path: str, poll_ms: int = 700, parent=None):
+   |         ^^^^^^^^
+21 |         super().__init__(parent)
+22 |         self.path = path
+   |
+help: Add return type annotation: `None`
+
+ANN001 Missing type annotation for function argument `parent`
+  --> QueueManagerGUI_v2.py:20:55
+   |
+18 |     new_lines = QtCore.pyqtSignal(list)
+19 |
+20 |     def __init__(self, path: str, poll_ms: int = 700, parent=None):
+   |                                                       ^^^^^^
+21 |         super().__init__(parent)
+22 |         self.path = path
+   |
+
+ANN201 Missing return type annotation for public function `start`
+  --> QueueManagerGUI_v2.py:29:9
+   |
+27 |         self._inode = None
+28 |
+29 |     def start(self):
+   |         ^^^^^
+30 |         self._timer.start(self.poll_ms)
+   |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `stop`
+  --> QueueManagerGUI_v2.py:32:9
+   |
+30 |         self._timer.start(self.poll_ms)
+31 |
+32 |     def stop(self):
+   |         ^^^^
+33 |         self._timer.stop()
+   |
+help: Add return type annotation: `None`
+
+ANN202 Missing return type annotation for private function `_poll`
+  --> QueueManagerGUI_v2.py:35:9
+   |
+33 |         self._timer.stop()
+34 |
+35 |     def _poll(self):
+   |         ^^^^^
+36 |         try:
+37 |             if not os.path.exists(self.path):
+   |
+help: Add return type annotation: `None`
+
+UP015 [*] Unnecessary mode argument
+  --> QueueManagerGUI_v2.py:44:34
+   |
+42 |                 self._pos = 0
+43 |                 self._inode = inode
+44 |             with open(self.path, "r", encoding="utf-8", errors="replace") as f:
+   |                                  ^^^
+45 |                 f.seek(self._pos)
+46 |                 chunk = f.read()
+   |
+help: Remove mode argument
+
+ANN204 Missing return type annotation for special method `__init__`
+  --> QueueManagerGUI_v2.py:75:9
+   |
+74 | class AddTaskDialog(QtWidgets.QDialog):
+75 |     def __init__(self, repo_path: str, seed: dict | None = None, parent=None):
+   |         ^^^^^^^^
+76 |         super().__init__(parent)
+77 |         self.setWindowTitle("Add Task (JSONL)")
+   |
+help: Add return type annotation: `None`
+
+ANN001 Missing type annotation for function argument `parent`
+  --> QueueManagerGUI_v2.py:75:66
+   |
+74 | class AddTaskDialog(QtWidgets.QDialog):
+75 |     def __init__(self, repo_path: str, seed: dict | None = None, parent=None):
+   |                                                                  ^^^^^^
+76 |         super().__init__(parent)
+77 |         self.setWindowTitle("Add Task (JSONL)")
+   |
+
+ANN201 Missing return type annotation for public function `apply_seed`
+   --> QueueManagerGUI_v2.py:112:9
+    |
+110 |             self.apply_seed(seed)
+111 |
+112 |     def apply_seed(self, seed: dict):
+    |         ^^^^^^^^^^
+113 |         def join_list(v):
+114 |             return " ".join(v) if isinstance(v, list) else (v or "")
+    |
+help: Add return type annotation: `None`
+
+ANN202 Missing return type annotation for private function `join_list`
+   --> QueueManagerGUI_v2.py:113:13
+    |
+112 |     def apply_seed(self, seed: dict):
+113 |         def join_list(v):
+    |             ^^^^^^^^^
+114 |             return " ".join(v) if isinstance(v, list) else (v or "")
+    |
+help: Add return type annotation
+
+ANN001 Missing type annotation for function argument `v`
+   --> QueueManagerGUI_v2.py:113:23
+    |
+112 |     def apply_seed(self, seed: dict):
+113 |         def join_list(v):
+    |                       ^
+114 |             return " ".join(v) if isinstance(v, list) else (v or "")
+    |
+
+E722 Do not use bare `except`
+   --> QueueManagerGUI_v2.py:133:13
+    |
+131 |             try:
+132 |                 self.timeout.setValue(int(seed["timeout_sec"]))
+133 |             except:
+    |             ^^^^^^
+134 |                 pass
+    |
+
+ANN204 Missing return type annotation for special method `__init__`
+   --> QueueManagerGUI_v2.py:158:9
+    |
+156 |     changed = QtCore.pyqtSignal()
+157 |
+158 |     def __init__(self, parent=None):
+    |         ^^^^^^^^
+159 |         super().__init__(parent)
+160 |         self.templates = {}  # name -> dict
+    |
+help: Add return type annotation: `None`
+
+ANN001 Missing type annotation for function argument `parent`
+   --> QueueManagerGUI_v2.py:158:24
+    |
+156 |     changed = QtCore.pyqtSignal()
+157 |
+158 |     def __init__(self, parent=None):
+    |                        ^^^^^^
+159 |         super().__init__(parent)
+160 |         self.templates = {}  # name -> dict
+    |
+
+ANN201 Missing return type annotation for public function `load`
+   --> QueueManagerGUI_v2.py:162:9
+    |
+160 |         self.templates = {}  # name -> dict
+161 |
+162 |     def load(self, path: str):
+    |         ^^^^
+163 |         try:
+164 |             data = json.load(open(path, "r", encoding="utf-8"))
+    |
+help: Add return type annotation: `None`
+
+UP015 [*] Unnecessary mode argument
+   --> QueueManagerGUI_v2.py:164:41
+    |
+162 |     def load(self, path: str):
+163 |         try:
+164 |             data = json.load(open(path, "r", encoding="utf-8"))
+    |                                         ^^^
+165 |             if isinstance(data, list):
+166 |                 # list of {name, task}
+    |
+help: Remove mode argument
+
+ANN201 Missing return type annotation for public function `builtin`
+   --> QueueManagerGUI_v2.py:177:9
+    |
+175 |             pass
+176 |
+177 |     def builtin(self):
+    |         ^^^^^^^
+178 |         self.templates = {
+179 |             "Git: fetch + prune": {"tool": "git", "args": ["fetch", "--all", "--prune"]},
+    |
+help: Add return type annotation: `None`
+
+ANN204 Missing return type annotation for special method `__init__`
+   --> QueueManagerGUI_v2.py:197:9
+    |
+196 | class MainWindow(QtWidgets.QMainWindow):
+197 |     def __init__(self):
+    |         ^^^^^^^^
+198 |         super().__init__()
+199 |         self.setWindowTitle(APP_TITLE)
+    |
+help: Add return type annotation: `None`
+
+N806 Variable `leftTabs` in function should be lowercase
+   --> QueueManagerGUI_v2.py:295:9
+    |
+293 |         self.refreshLedgerBtn = QtWidgets.QPushButton("Refresh Ledger")
+294 |         self.refreshLedgerBtn.clicked.connect(self.load_ledger)
+295 |         leftTabs = QtWidgets.QTabWidget()
+    |         ^^^^^^^^
+296 |         pageLog = QtWidgets.QWidget()
+297 |         vv = QtWidgets.QVBoxLayout(pageLog)
+    |
+
+N806 Variable `pageLog` in function should be lowercase
+   --> QueueManagerGUI_v2.py:296:9
+    |
+294 |         self.refreshLedgerBtn.clicked.connect(self.load_ledger)
+295 |         leftTabs = QtWidgets.QTabWidget()
+296 |         pageLog = QtWidgets.QWidget()
+    |         ^^^^^^^
+297 |         vv = QtWidgets.QVBoxLayout(pageLog)
+298 |         vv.addWidget(self.liveLog)
+    |
+
+N806 Variable `rightTabs` in function should be lowercase
+   --> QueueManagerGUI_v2.py:302:9
+    |
+301 |         # Right panel: Errors, Ledger, DLQ, Quarantine
+302 |         rightTabs = QtWidgets.QTabWidget()
+    |         ^^^^^^^^^
+303 |         errorsTab = QtWidgets.QWidget()
+304 |         v1 = QtWidgets.QVBoxLayout(errorsTab)
+    |
+
+N806 Variable `errorsTab` in function should be lowercase
+   --> QueueManagerGUI_v2.py:303:9
+    |
+301 |         # Right panel: Errors, Ledger, DLQ, Quarantine
+302 |         rightTabs = QtWidgets.QTabWidget()
+303 |         errorsTab = QtWidgets.QWidget()
+    |         ^^^^^^^^^
+304 |         v1 = QtWidgets.QVBoxLayout(errorsTab)
+305 |         v1.addWidget(QtWidgets.QLabel("Recent errors (doubleΓÇæclick to open folder):"))
+    |
+
+N806 Variable `ledgerTab` in function should be lowercase
+   --> QueueManagerGUI_v2.py:309:9
+    |
+307 |         rightTabs.addTab(errorsTab, "Errors")
+308 |
+309 |         ledgerTab = QtWidgets.QWidget()
+    |         ^^^^^^^^^
+310 |         v2 = QtWidgets.QVBoxLayout(ledgerTab)
+311 |         v2.addWidget(self.refreshLedgerBtn)
+    |
+
+N806 Variable `dlqTab` in function should be lowercase
+   --> QueueManagerGUI_v2.py:324:9
+    |
+322 |         self.btnDLQRetry.clicked.connect(self.retry_selected_dlq)
+323 |         self.btnDLQDelete.clicked.connect(self.delete_selected_dlq)
+324 |         dlqTab = QtWidgets.QWidget()
+    |         ^^^^^^
+325 |         v3 = QtWidgets.QVBoxLayout(dlqTab)
+326 |         hdlq = QtWidgets.QHBoxLayout()
+    |
+
+N806 Variable `qTab` in function should be lowercase
+   --> QueueManagerGUI_v2.py:351:9
+    |
+349 |         self.btnCBRefresh.clicked.connect(self.refresh_breakers)
+350 |         self.btnCBForceClose.clicked.connect(self.force_close_breaker)
+351 |         qTab = QtWidgets.QWidget()
+    |         ^^^^
+352 |         v4 = QtWidgets.QVBoxLayout(qTab)
+353 |         v4.addWidget(self.btnCBRefresh)
+    |
+
+ANN201 Missing return type annotation for public function `update_default_paths`
+   --> QueueManagerGUI_v2.py:411:9
+    |
+409 |         return os.path.join(self.repo_dir(), STATE_DIR)
+410 |
+411 |     def update_default_paths(self):
+    |         ^^^^^^^^^^^^^^^^^^^^
+412 |         self.tasksEdit.setPlaceholderText(os.path.join(self.repo_dir(), DEF_TASKS))
+413 |         self.logsEdit.setPlaceholderText(os.path.join(self.repo_dir(), DEF_LOGS))
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `choose_repo`
+   --> QueueManagerGUI_v2.py:420:9
+    |
+419 |     # ===== UI actions =====
+420 |     def choose_repo(self):
+    |         ^^^^^^^^^^^
+421 |         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Choose Repo", self.repo_dir())
+422 |         if d:
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `choose_tasks`
+   --> QueueManagerGUI_v2.py:427:9
+    |
+425 |             self.try_load_default_templates()
+426 |
+427 |     def choose_tasks(self):
+    |         ^^^^^^^^^^^^
+428 |         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Choose .tasks", self.tasks_dir())
+429 |         if d:
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `choose_logs`
+   --> QueueManagerGUI_v2.py:432:9
+    |
+430 |             self.tasksEdit.setText(d)
+431 |
+432 |     def choose_logs(self):
+    |         ^^^^^^^^^^^
+433 |         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Choose logs", self.logs_dir())
+434 |         if d:
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `start_worker`
+   --> QueueManagerGUI_v2.py:438:9
+    |
+436 |             self.tailer.path = os.path.join(self.logs_dir(), "queueworker.log")
+437 |
+438 |     def start_worker(self):
+    |         ^^^^^^^^^^^^
+439 |         sup = os.path.join(self.repo_dir(), "scripts", "Supervisor.ps1")
+440 |         if not os.path.exists(sup):
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `stop_worker`
+   --> QueueManagerGUI_v2.py:457:9
+    |
+455 |             QtWidgets.QMessageBox.critical(self, "Error", str(e))
+456 |
+457 |     def stop_worker(self):
+    |         ^^^^^^^^^^^
+458 |         stopfile = os.path.join(self.repo_dir(), "STOP.HEADLESS")
+459 |         try:
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `refresh_templates`
+   --> QueueManagerGUI_v2.py:467:9
+    |
+466 |     # ===== Templates =====
+467 |     def refresh_templates(self):
+    |         ^^^^^^^^^^^^^^^^^
+468 |         self.templatePicker.clear()
+469 |         for name in sorted(self.templates.templates.keys()):
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `enqueue_template`
+   --> QueueManagerGUI_v2.py:476:9
+    |
+474 |         return self.templates.templates.get(name)
+475 |
+476 |     def enqueue_template(self):
+    |         ^^^^^^^^^^^^^^^^
+477 |         task = self.get_selected_template_task()
+478 |         if not task:
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `open_template_in_dialog`
+   --> QueueManagerGUI_v2.py:486:9
+    |
+484 |         self.enqueue_task_dict(task)
+485 |
+486 |     def open_template_in_dialog(self):
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+487 |         task = self.get_selected_template_task()
+488 |         if not task:
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `load_templates_from_disk`
+   --> QueueManagerGUI_v2.py:497:9
+    |
+495 |             self.enqueue_task_dict(dlg.build_task())
+496 |
+497 |     def load_templates_from_disk(self):
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^
+498 |         path, _ = QtWidgets.QFileDialog.getOpenFileName(
+499 |             self, "Load Templates JSON", self.repo_dir(), "JSON (*.json)"
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `try_load_default_templates`
+   --> QueueManagerGUI_v2.py:505:9
+    |
+503 |         self.templates.load(path)
+504 |
+505 |     def try_load_default_templates(self):
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+506 |         path = os.path.join(self.repo_dir(), DEFAULT_TEMPLATES_REL)
+507 |         if os.path.exists(path):
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `add_task`
+   --> QueueManagerGUI_v2.py:511:9
+    |
+510 |     # ===== Task enqueue & retry =====
+511 |     def add_task(self):
+    |         ^^^^^^^^
+512 |         dlg = AddTaskDialog(self.repo_dir(), parent=self)
+513 |         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `enqueue_task_dict`
+   --> QueueManagerGUI_v2.py:516:9
+    |
+514 |             self.enqueue_task_dict(dlg.build_task())
+515 |
+516 |     def enqueue_task_dict(self, task: dict):
+    |         ^^^^^^^^^^^^^^^^^
+517 |         inbox = os.path.join(self.tasks_dir(), "inbox")
+518 |         os.makedirs(inbox, exist_ok=True)
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `retry_failed`
+   --> QueueManagerGUI_v2.py:526:9
+    |
+524 |         QtWidgets.QMessageBox.information(self, "Queued", f"Task enqueued:\n{path}")
+525 |
+526 |     def retry_failed(self):
+    |         ^^^^^^^^^^^^
+527 |         self.refresh_dlq()  # loads lists
+528 |         inbox = os.path.join(self.tasks_dir(), "inbox")
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `refresh_dlq`
+   --> QueueManagerGUI_v2.py:546:9
+    |
+545 |     # ===== DLQ inspector =====
+546 |     def refresh_dlq(self):
+    |         ^^^^^^^^^^^
+547 |         self.failedList.clear()
+548 |         self.quarantineList.clear()
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `delete_selected_dlq`
+   --> QueueManagerGUI_v2.py:567:9
+    |
+565 |                         widget.addItem(it)
+566 |
+567 |     def delete_selected_dlq(self):
+    |         ^^^^^^^^^^^^^^^^^^^
+568 |         total = 0
+569 |         for lst in (self.failedList, self.quarantineList):
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `retry_selected_dlq`
+   --> QueueManagerGUI_v2.py:580:9
+    |
+578 |         QtWidgets.QMessageBox.information(self, "Delete", f"Deleted {total} file(s).")
+579 |
+580 |     def retry_selected_dlq(self):
+    |         ^^^^^^^^^^^^^^^^^^
+581 |         inbox = os.path.join(self.tasks_dir(), "inbox")
+582 |         os.makedirs(inbox, exist_ok=True)
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `refresh_breakers`
+   --> QueueManagerGUI_v2.py:599:9
+    |
+597 |         return os.path.join(self.state_dir(), "circuit_breakers.json")
+598 |
+599 |     def refresh_breakers(self):
+    |         ^^^^^^^^^^^^^^^^
+600 |         path = self.breakers_path()
+601 |         self.breakerView.setRowCount(0)
+    |
+help: Add return type annotation: `None`
+
+UP015 [*] Unnecessary mode argument
+   --> QueueManagerGUI_v2.py:605:41
+    |
+603 |             return
+604 |         try:
+605 |             data = json.load(open(path, "r", encoding="utf-8"))
+    |                                         ^^^
+606 |             if not isinstance(data, dict):
+607 |                 return
+    |
+help: Remove mode argument
+
+ANN201 Missing return type annotation for public function `force_close_breaker`
+   --> QueueManagerGUI_v2.py:619:9
+    |
+617 |             pass
+618 |
+619 |     def force_close_breaker(self):
+    |         ^^^^^^^^^^^^^^^^^^^
+620 |         path = self.breakers_path()
+621 |         if not os.path.exists(path):
+    |
+help: Add return type annotation: `None`
+
+UP015 [*] Unnecessary mode argument
+   --> QueueManagerGUI_v2.py:625:41
+    |
+623 |             return
+624 |         try:
+625 |             data = json.load(open(path, "r", encoding="utf-8"))
+    |                                         ^^^
+626 |             rows = {
+627 |                 self.breakerView.item(i, 0).text(): i for i in range(self.breakerView.rowCount())
+    |
+help: Remove mode argument
+
+F841 Local variable `rows` is assigned to but never used
+   --> QueueManagerGUI_v2.py:626:13
+    |
+624 |         try:
+625 |             data = json.load(open(path, "r", encoding="utf-8"))
+626 |             rows = {
+    |             ^^^^
+627 |                 self.breakerView.item(i, 0).text(): i for i in range(self.breakerView.rowCount())
+628 |             }
+    |
+help: Remove assignment to unused variable `rows`
+
+ANN201 Missing return type annotation for public function `on_new_log_lines`
+   --> QueueManagerGUI_v2.py:646:9
+    |
+645 |     # ===== Live log & filters =====
+646 |     def on_new_log_lines(self, lines: list[str]):
+    |         ^^^^^^^^^^^^^^^^
+647 |         at_end = (
+648 |             self.liveLog.verticalScrollBar().value() == self.liveLog.verticalScrollBar().maximum()
+    |
+help: Add return type annotation: `None`
+
+E501 Line too long (103 > 100)
+   --> QueueManagerGUI_v2.py:657:101
+    |
+655 |             # tool filter
+656 |             if tool_filter != "all":
+657 |                 # heuristic: include if tool name appears in line, e.g., "[git]" or "git:" or " [git] "
+    |                                                                                                     ^^^
+658 |                 if (
+659 |                     f"[{tool_filter}]" not in low
+    |
+
+ANN201 Missing return type annotation for public function `load_ledger`
+   --> QueueManagerGUI_v2.py:688:9
+    |
+687 |     # ===== Ledger & heartbeat =====
+688 |     def load_ledger(self):
+    |         ^^^^^^^^^^^
+689 |         self.ledgerList.clear()
+690 |         ledger = os.path.join(self.logs_dir(), "ledger.jsonl")
+    |
+help: Add return type annotation: `None`
+
+UP015 [*] Unnecessary mode argument
+   --> QueueManagerGUI_v2.py:695:31
+    |
+693 |             return
+694 |         try:
+695 |             with open(ledger, "r", encoding="utf-8", errors="replace") as f:
+    |                               ^^^
+696 |                 lines = f.readlines()[-500:]
+697 |             for ln in lines:
+    |
+help: Remove mode argument
+
+ANN201 Missing return type annotation for public function `check_heartbeat`
+   --> QueueManagerGUI_v2.py:717:9
+    |
+715 |             self.ledgerList.addItem(f"Error reading ledger: {e}")
+716 |
+717 |     def check_heartbeat(self):
+    |         ^^^^^^^^^^^^^^^
+718 |         hb = os.path.join(self.state_dir(), "heartbeat.json")
+719 |         if not os.path.exists(hb):
+    |
+help: Add return type annotation: `None`
+
+UP015 [*] Unnecessary mode argument
+   --> QueueManagerGUI_v2.py:723:39
+    |
+721 |             return
+722 |         try:
+723 |             data = json.load(open(hb, "r", encoding="utf-8"))
+    |                                       ^^^
+724 |             ts_raw = data.get("timestamp", "")
+725 |             if not ts_raw:
+    |
+help: Remove mode argument
+
+ANN201 Missing return type annotation for public function `open_folder`
+   --> QueueManagerGUI_v2.py:736:9
+    |
+735 |     # ===== Misc helpers =====
+736 |     def open_folder(self, path: str):
+    |         ^^^^^^^^^^^
+737 |         if not os.path.isdir(path):
+738 |             os.makedirs(path, exist_ok=True)
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `open_selected_log`
+   --> QueueManagerGUI_v2.py:746:9
+    |
+744 |             subprocess.call(["xdg-open", path])
+745 |
+746 |     def open_selected_log(self):
+    |         ^^^^^^^^^^^^^^^^^
+747 |         item = self.errorsList.currentItem()
+748 |         if not item:
+    |
+help: Add return type annotation: `None`
+
+ANN201 Missing return type annotation for public function `main`
+   --> QueueManagerGUI_v2.py:755:5
+    |
+755 | def main():
+    |     ^^^^
+756 |     app = QtWidgets.QApplication(sys.argv)
+757 |     w = MainWindow()
+    |
+help: Add return type annotation: `None`
+
+Found 58 errors.
+[*] 8 fixable with the `--fix` option (36 hidden fixes can be enabled with the `--unsafe-fixes` option).

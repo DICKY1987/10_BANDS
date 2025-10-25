@@ -1,0 +1,480 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<test-results xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="nunit_schema_2.5.xsd" name="Pester" total="104" errors="0" failures="10" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="2025-10-24" time="20:34:44">
+  <environment user-domain="5CD847950M" cwd="C:\Users\Richard Wilks\CLI_RESTART\10_bands" os-version="10.0.26100" nunit-version="2.5.8.0" user="Richard Wilks" platform="Microsoft Windows 11 Pro|C:\WINDOWS|\Device\Harddisk0\Partition3" clr-version="9.0.8" machine-name="5CD847950M" />
+  <culture-info current-culture="en-US" current-uiculture="en-US" />
+  <test-suite type="TestFixture" name="Pester" executed="True" result="Failure" success="False" time="11.9214" asserts="0" description="Pester">
+    <results>
+      <test-suite type="TestFixture" name="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\AutomationSuite.Tests.ps1" executed="True" result="Success" success="True" time="7.6531" asserts="0" description="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\AutomationSuite.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="AutomationSuite Module Tests" executed="True" result="Success" success="True" time="6.9534" asserts="0" description="AutomationSuite Module Tests">
+            <results>
+              <test-suite type="TestFixture" name="AutomationSuite Module Tests.Write-AutomationLog Function" executed="True" result="Success" success="True" time="1.1235" asserts="0" description="AutomationSuite Module Tests.Write-AutomationLog Function">
+                <results>
+                  <test-case description="should be exported from module" name="AutomationSuite Module Tests.Write-AutomationLog Function.should be exported from module" time="0.1414" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should accept all required log levels" name="AutomationSuite Module Tests.Write-AutomationLog Function.should accept all required log levels" time="0.5077" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should handle additional Data parameter" name="AutomationSuite Module Tests.Write-AutomationLog Function.should handle additional Data parameter" time="0.1159" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should handle Exception parameter" name="AutomationSuite Module Tests.Write-AutomationLog Function.should handle Exception parameter" time="0.108" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should handle CorrelationId parameter" name="AutomationSuite Module Tests.Write-AutomationLog Function.should handle CorrelationId parameter" time="0.101" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should output formatted log entry" name="AutomationSuite Module Tests.Write-AutomationLog Function.should output formatted log entry" time="0.1049" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="AutomationSuite Module Tests.Start-AutomationCliJob Function" executed="True" result="Success" success="True" time="4.3251" asserts="0" description="AutomationSuite Module Tests.Start-AutomationCliJob Function">
+                <results>
+                  <test-case description="should be exported from module" name="AutomationSuite Module Tests.Start-AutomationCliJob Function.should be exported from module" time="0.0199" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should require ToolConfig parameter" name="AutomationSuite Module Tests.Start-AutomationCliJob Function.should require ToolConfig parameter" time="0.0326" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should start background job with valid config" name="AutomationSuite Module Tests.Start-AutomationCliJob Function.should start background job with valid config" time="0.9314" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should tag output with tool name" name="AutomationSuite Module Tests.Start-AutomationCliJob Function.should tag output with tool name" time="0.7339" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should handle errors within job gracefully" name="AutomationSuite Module Tests.Start-AutomationCliJob Function.should handle errors within job gracefully" time="0.7507" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should pass arguments to tool correctly" name="AutomationSuite Module Tests.Start-AutomationCliJob Function.should pass arguments to tool correctly" time="0.7057" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="AutomationSuite Module Tests.Get-ToolColor Function" executed="True" result="Success" success="True" time="4.5009" asserts="0" description="AutomationSuite Module Tests.Get-ToolColor Function">
+                <results>
+                  <test-case description="should be exported from module" name="AutomationSuite Module Tests.Get-ToolColor Function.should be exported from module" time="0.0282" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should return color from color map when tool exists" name="AutomationSuite Module Tests.Get-ToolColor Function.should return color from color map when tool exists" time="0.0263" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should return default color when tool not in map" name="AutomationSuite Module Tests.Get-ToolColor Function.should return default color when tool not in map" time="0.0055" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should handle invalid color gracefully" name="AutomationSuite Module Tests.Get-ToolColor Function.should handle invalid color gracefully" time="0.0086" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should support all valid ConsoleColor values" name="AutomationSuite Module Tests.Get-ToolColor Function.should support all valid ConsoleColor values" time="0.0861" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="AutomationSuite Module Tests.Module Export Validation" executed="True" result="Success" success="True" time="4.5651" asserts="0" description="AutomationSuite Module Tests.Module Export Validation">
+                <results>
+                  <test-case description="should export exactly three functions" name="AutomationSuite Module Tests.Module Export Validation.should export exactly three functions" time="0.0138" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should export Write-AutomationLog" name="AutomationSuite Module Tests.Module Export Validation.should export Write-AutomationLog" time="0.0119" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should export Start-AutomationCliJob" name="AutomationSuite Module Tests.Module Export Validation.should export Start-AutomationCliJob" time="0.0075" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should export Get-ToolColor" name="AutomationSuite Module Tests.Module Export Validation.should export Get-ToolColor" time="0.0079" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="AutomationSuite Module Tests.Integration: Complete Job Lifecycle" executed="True" result="Success" success="True" time="6.6575" asserts="0" description="AutomationSuite Module Tests.Integration: Complete Job Lifecycle">
+                <results>
+                  <test-case description="should execute complete job workflow with monitoring" name="AutomationSuite Module Tests.Integration: Complete Job Lifecycle.should execute complete job workflow with monitoring" time="0.7932" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should handle multiple concurrent jobs" name="AutomationSuite Module Tests.Integration: Complete Job Lifecycle.should handle multiple concurrent jobs" time="1.2795" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="AutomationSuite Module Tests.Error Handling and Edge Cases" executed="True" result="Success" success="True" time="6.9002" asserts="0" description="AutomationSuite Module Tests.Error Handling and Edge Cases">
+                <results>
+                  <test-case description="should throw meaningful error for missing tool name" name="AutomationSuite Module Tests.Error Handling and Edge Cases.should throw meaningful error for missing tool name" time="0.0123" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should throw meaningful error for missing path" name="AutomationSuite Module Tests.Error Handling and Edge Cases.should throw meaningful error for missing path" time="0.0135" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should handle empty arguments array" name="AutomationSuite Module Tests.Error Handling and Edge Cases.should handle empty arguments array" time="0.195" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\launch_10_bands_profile.Tests.ps1" executed="True" result="Failure" success="False" time="1.2327" asserts="0" description="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\launch_10_bands_profile.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests" executed="True" result="Failure" success="False" time="0.9648" asserts="0" description="launch_10_bands_profile Script Tests">
+            <results>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Write-Log Function" executed="True" result="Success" success="True" time="0.1081" asserts="0" description="launch_10_bands_profile Script Tests.Write-Log Function">
+                <results>
+                  <test-case description="should output messages with correct format" name="launch_10_bands_profile Script Tests.Write-Log Function.should output messages with correct format" time="0.02" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should support all required log levels" name="launch_10_bands_profile Script Tests.Write-Log Function.should support all required log levels" time="0.0264" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should use different colors for different levels" name="launch_10_bands_profile Script Tests.Write-Log Function.should use different colors for different levels" time="0.0195" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Parameter Validation" executed="True" result="Success" success="True" time="0.3571" asserts="0" description="launch_10_bands_profile Script Tests.Parameter Validation">
+                <results>
+                  <test-case description="should have ProfileName parameter with default value" name="launch_10_bands_profile Script Tests.Parameter Validation.should have ProfileName parameter with default value" time="0.0776" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should have Fullscreen switch parameter with default true" name="launch_10_bands_profile Script Tests.Parameter Validation.should have Fullscreen switch parameter with default true" time="0.0053" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should have UpdateProfile switch parameter" name="launch_10_bands_profile Script Tests.Parameter Validation.should have UpdateProfile switch parameter" time="0.0571" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should have UseExistingWindow switch parameter" name="launch_10_bands_profile Script Tests.Parameter Validation.should have UseExistingWindow switch parameter" time="0.0928" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Windows Terminal Detection" executed="True" result="Failure" success="False" time="0.496" asserts="0" description="launch_10_bands_profile Script Tests.Windows Terminal Detection">
+                <results>
+                  <test-case description="should check for wt command availability" name="launch_10_bands_profile Script Tests.Windows Terminal Detection.should check for wt command availability" time="0" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>This test should run but it did not. Most likely a setup in some parent block failed.</message>
+                      <stack-trace />
+                    </failure>
+                  </test-case>
+                  <test-case description="should throw error when wt is not available" name="launch_10_bands_profile Script Tests.Windows Terminal Detection.should throw error when wt is not available" time="0" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>This test should run but it did not. Most likely a setup in some parent block failed.</message>
+                      <stack-trace />
+                    </failure>
+                  </test-case>
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Profile Update Logic" executed="True" result="Success" success="True" time="0.5304" asserts="0" description="launch_10_bands_profile Script Tests.Profile Update Logic">
+                <results>
+                  <test-case description="should call Update-WTProfile.ps1 when UpdateProfile is set" name="launch_10_bands_profile Script Tests.Profile Update Logic.should call Update-WTProfile.ps1 when UpdateProfile is set" time="0.0058" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should pass ProfileName to Update-WTProfile.ps1" name="launch_10_bands_profile Script Tests.Profile Update Logic.should pass ProfileName to Update-WTProfile.ps1" time="0.0044" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should check exit code after profile update" name="launch_10_bands_profile Script Tests.Profile Update Logic.should check exit code after profile update" time="0.0042" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should throw on profile update failure" name="launch_10_bands_profile Script Tests.Profile Update Logic.should throw on profile update failure" time="0.0038" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Launch Arguments Building" executed="True" result="Failure" success="False" time="0.6093" asserts="0" description="launch_10_bands_profile Script Tests.Launch Arguments Building">
+                <results>
+                  <test-case description="should build basic launch arguments with profile name" name="launch_10_bands_profile Script Tests.Launch Arguments Building.should build basic launch arguments with profile name" time="0.0182" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should add fullscreen flag when Fullscreen is true" name="launch_10_bands_profile Script Tests.Launch Arguments Building.should add fullscreen flag when Fullscreen is true" time="0.037" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>Expected regular expression 'if \(\$Fullscreen\).*--fullscreen' to match '#!/usr/bin/env pwsh
+# launch_10_bands_profile.ps1
+# Simplified launcher using Windows Terminal profile
+#Requires -Version 5.1
+&lt;#
+.SYNOPSIS
+Launch the 10_Bands Windows Terminal profile.
+.PARAMETER ProfileName
+Profile to launch (default: 10_Bands).
+.PARAMETER Fullscreen
+Launch in fullscreen (default: $true).
+.PARAMETER UpdateProfile
+If set, updates/creates the Windows Terminal profile before launching.
+.PARAMETER UseExistingWindow
+If set, targets the last existing WT window (-w last).
+#&gt;
+param(
+    [string]$ProfileName = '10_Bands',
+    [switch]$Fullscreen = $true,
+    [switch]$UpdateProfile,
+    [switch]$UseExistingWindow
+)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+function Write-Log {
+    param([string]$Message, [ValidateSet('INFO','WARN','ERROR','SUCCESS')]$Level='INFO')
+    $colors = @{ 'INFO' = 'Cyan'; 'WARN' = 'Yellow'; 'ERROR' = 'Red'; 'SUCCESS' = 'Green' }
+    Write-Host "[$Level] $Message" -ForegroundColor $colors[$Level]
+}
+try {
+    # Check if wt is available
+    $wt = Get-Command wt -ErrorAction SilentlyContinue
+    if (-not $wt) {
+        throw "Windows Terminal 'wt' not found. Install from Microsoft Store or winget."
+    }
+    # Update profile if requested
+    if ($UpdateProfile) {
+        Write-Log "Updating Windows Terminal profile..." 'INFO'
+        $updateScript = Join-Path $PSScriptRoot 'Modules\Update-WTProfile.ps1'
+        if (-not (Test-Path $updateScript)) {
+            throw "Profile updater not found: $updateScript"
+        }
+        &amp; $updateScript -ProfileName $ProfileName
+        if ($LASTEXITCODE -ne 0) {
+            throw "Profile update failed with exit code $LASTEXITCODE"
+        }
+        Write-Log "Profile updated successfully!" 'SUCCESS'
+    }
+    # Build launch arguments
+    $wtArgs = @('-p', $ProfileName)
+    if ($Fullscreen) {
+        $wtArgs += '--fullscreen'
+    }
+    if ($UseExistingWindow) {
+        $wtArgs += @('-w', 'last')
+    }
+    Write-Log "Launching Windows Terminal with profile '$ProfileName'..." 'INFO'
+    Write-Log "Command: wt $($wtArgs -join ' ')" 'INFO'
+    # Launch Windows Terminal with profile
+    &amp; wt @wtArgs
+    Write-Log "10_Bands layout launched!" 'SUCCESS'
+    exit 0
+} catch {
+    Write-Log "Failed to launch: $($_.Exception.Message)" 'ERROR'
+    Write-Log "Troubleshooting:" 'WARN'
+    Write-Log "  1. Ensure Windows Terminal is installed" 'WARN'
+    Write-Log "  2. Run with -UpdateProfile to create/update the profile" 'WARN'
+    Write-Log "  3. Check that tools (claude, codex, aider) are on PATH" 'WARN'
+    exit 1
+}
+', but it did not match.</message>
+                      <stack-trace>at $scriptContent | Should -Match 'if \(\$Fullscreen\).*--fullscreen', C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\launch_10_bands_profile.Tests.ps1:114
+at &lt;ScriptBlock&gt;, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\launch_10_bands_profile.Tests.ps1:114</stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case description="should add window flag when UseExistingWindow is true" name="launch_10_bands_profile Script Tests.Launch Arguments Building.should add window flag when UseExistingWindow is true" time="0.0103" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>Expected regular expression 'if \(\$UseExistingWindow\).*-w.*last' to match '#!/usr/bin/env pwsh
+# launch_10_bands_profile.ps1
+# Simplified launcher using Windows Terminal profile
+#Requires -Version 5.1
+&lt;#
+.SYNOPSIS
+Launch the 10_Bands Windows Terminal profile.
+.PARAMETER ProfileName
+Profile to launch (default: 10_Bands).
+.PARAMETER Fullscreen
+Launch in fullscreen (default: $true).
+.PARAMETER UpdateProfile
+If set, updates/creates the Windows Terminal profile before launching.
+.PARAMETER UseExistingWindow
+If set, targets the last existing WT window (-w last).
+#&gt;
+param(
+    [string]$ProfileName = '10_Bands',
+    [switch]$Fullscreen = $true,
+    [switch]$UpdateProfile,
+    [switch]$UseExistingWindow
+)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+function Write-Log {
+    param([string]$Message, [ValidateSet('INFO','WARN','ERROR','SUCCESS')]$Level='INFO')
+    $colors = @{ 'INFO' = 'Cyan'; 'WARN' = 'Yellow'; 'ERROR' = 'Red'; 'SUCCESS' = 'Green' }
+    Write-Host "[$Level] $Message" -ForegroundColor $colors[$Level]
+}
+try {
+    # Check if wt is available
+    $wt = Get-Command wt -ErrorAction SilentlyContinue
+    if (-not $wt) {
+        throw "Windows Terminal 'wt' not found. Install from Microsoft Store or winget."
+    }
+    # Update profile if requested
+    if ($UpdateProfile) {
+        Write-Log "Updating Windows Terminal profile..." 'INFO'
+        $updateScript = Join-Path $PSScriptRoot 'Modules\Update-WTProfile.ps1'
+        if (-not (Test-Path $updateScript)) {
+            throw "Profile updater not found: $updateScript"
+        }
+        &amp; $updateScript -ProfileName $ProfileName
+        if ($LASTEXITCODE -ne 0) {
+            throw "Profile update failed with exit code $LASTEXITCODE"
+        }
+        Write-Log "Profile updated successfully!" 'SUCCESS'
+    }
+    # Build launch arguments
+    $wtArgs = @('-p', $ProfileName)
+    if ($Fullscreen) {
+        $wtArgs += '--fullscreen'
+    }
+    if ($UseExistingWindow) {
+        $wtArgs += @('-w', 'last')
+    }
+    Write-Log "Launching Windows Terminal with profile '$ProfileName'..." 'INFO'
+    Write-Log "Command: wt $($wtArgs -join ' ')" 'INFO'
+    # Launch Windows Terminal with profile
+    &amp; wt @wtArgs
+    Write-Log "10_Bands layout launched!" 'SUCCESS'
+    exit 0
+} catch {
+    Write-Log "Failed to launch: $($_.Exception.Message)" 'ERROR'
+    Write-Log "Troubleshooting:" 'WARN'
+    Write-Log "  1. Ensure Windows Terminal is installed" 'WARN'
+    Write-Log "  2. Run with -UpdateProfile to create/update the profile" 'WARN'
+    Write-Log "  3. Check that tools (claude, codex, aider) are on PATH" 'WARN'
+    exit 1
+}
+', but it did not match.</message>
+                      <stack-trace>at $scriptContent | Should -Match 'if \(\$UseExistingWindow\).*-w.*last', C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\launch_10_bands_profile.Tests.ps1:119
+at &lt;ScriptBlock&gt;, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\launch_10_bands_profile.Tests.ps1:119</stack-trace>
+                    </failure>
+                  </test-case>
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Windows Terminal Launch" executed="True" result="Success" success="True" time="0.6549" asserts="0" description="launch_10_bands_profile Script Tests.Windows Terminal Launch">
+                <results>
+                  <test-case description="should launch wt with constructed arguments" name="launch_10_bands_profile Script Tests.Windows Terminal Launch.should launch wt with constructed arguments" time="0.0154" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should log launch command for debugging" name="launch_10_bands_profile Script Tests.Windows Terminal Launch.should log launch command for debugging" time="0.0173" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Error Handling and Troubleshooting" executed="True" result="Success" success="True" time="0.7156" asserts="0" description="launch_10_bands_profile Script Tests.Error Handling and Troubleshooting">
+                <results>
+                  <test-case description="should provide troubleshooting tips on failure" name="launch_10_bands_profile Script Tests.Error Handling and Troubleshooting.should provide troubleshooting tips on failure" time="0.0077" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should suggest running with UpdateProfile flag" name="launch_10_bands_profile Script Tests.Error Handling and Troubleshooting.should suggest running with UpdateProfile flag" time="0.0037" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should mention checking tool availability" name="launch_10_bands_profile Script Tests.Error Handling and Troubleshooting.should mention checking tool availability" time="0.0038" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should exit with error code on failure" name="launch_10_bands_profile Script Tests.Error Handling and Troubleshooting.should exit with error code on failure" time="0.0165" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should exit with success code on success" name="launch_10_bands_profile Script Tests.Error Handling and Troubleshooting.should exit with success code on success" time="0.0149" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Script Structure and Best Practices" executed="True" result="Failure" success="False" time="0.8008" asserts="0" description="launch_10_bands_profile Script Tests.Script Structure and Best Practices">
+                <results>
+                  <test-case description="should use StrictMode" name="launch_10_bands_profile Script Tests.Script Structure and Best Practices.should use StrictMode" time="0.0079" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should set ErrorActionPreference to Stop" name="launch_10_bands_profile Script Tests.Script Structure and Best Practices.should set ErrorActionPreference to Stop" time="0.0244" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>RegexParseException: Invalid pattern '\Continue\s*=\s*'Stop'' at offset 2. Unrecognized escape sequence \C.</message>
+                      <stack-trace />
+                    </failure>
+                  </test-case>
+                  <test-case description="should require PowerShell 5.1 or higher" name="launch_10_bands_profile Script Tests.Script Structure and Best Practices.should require PowerShell 5.1 or higher" time="0.0151" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should use try-catch for error handling" name="launch_10_bands_profile Script Tests.Script Structure and Best Practices.should use try-catch for error handling" time="0.0184" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Output and Logging" executed="True" result="Success" success="True" time="0.845" asserts="0" description="launch_10_bands_profile Script Tests.Output and Logging">
+                <results>
+                  <test-case description="should log launch initiation" name="launch_10_bands_profile Script Tests.Output and Logging.should log launch initiation" time="0.0053" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should log successful launch" name="launch_10_bands_profile Script Tests.Output and Logging.should log successful launch" time="0.0039" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should log failures" name="launch_10_bands_profile Script Tests.Output and Logging.should log failures" time="0.0174" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="launch_10_bands_profile Script Tests.Integration: Full Launch Workflow" executed="True" result="Success" success="True" time="0.943" asserts="0" description="launch_10_bands_profile Script Tests.Integration: Full Launch Workflow">
+                <results>
+                  <test-case description="should execute complete workflow without errors in structure" name="launch_10_bands_profile Script Tests.Integration: Full Launch Workflow.should execute complete workflow without errors in structure" time="0.0101" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1" executed="True" result="Failure" success="False" time="1.6293" asserts="0" description="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="setup_profile Script Tests" executed="True" result="Failure" success="False" time="1.3813" asserts="0" description="setup_profile Script Tests">
+            <results>
+              <test-suite type="TestFixture" name="setup_profile Script Tests.Write-Log Function" executed="True" result="Success" success="True" time="0.0313" asserts="0" description="setup_profile Script Tests.Write-Log Function">
+                <results>
+                  <test-case description="should output colored messages based on level" name="setup_profile Script Tests.Write-Log Function.should output colored messages based on level" time="0.0035" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should support all log levels" name="setup_profile Script Tests.Write-Log Function.should support all log levels" time="0.0116" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="setup_profile Script Tests.New-DesktopShortcut Function" executed="True" result="Failure" success="False" time="0.2863" asserts="0" description="setup_profile Script Tests.New-DesktopShortcut Function">
+                <results>
+                  <test-case description="should create shortcut with correct properties" name="setup_profile Script Tests.New-DesktopShortcut Function.should create shortcut with correct properties" time="0.2041" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>Expected no exception to be thrown, but an exception "You cannot call a method on a null-valued expression." was thrown from line:8 char:5
+    +     $shortcut = $wsh.CreateShortcut($lnkPath)
+    +     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~.</message>
+                      <stack-trace>at { New-DesktopShortcut -Name "TestShortcut" -ProfileName "TestProfile" } | Should -Not -Throw, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1:81
+at &lt;ScriptBlock&gt;, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1:81</stack-trace>
+                    </failure>
+                  </test-case>
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="setup_profile Script Tests.Test-ToolAvailability Function" executed="True" result="Success" success="True" time="0.3872" asserts="0" description="setup_profile Script Tests.Test-ToolAvailability Function">
+                <results>
+                  <test-case description="should detect available tools" name="setup_profile Script Tests.Test-ToolAvailability Function.should detect available tools" time="0.0444" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should identify missing tools" name="setup_profile Script Tests.Test-ToolAvailability Function.should identify missing tools" time="0.0363" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="setup_profile Script Tests.Parameter Validation" executed="True" result="Failure" success="False" time="0.8862" asserts="0" description="setup_profile Script Tests.Parameter Validation">
+                <results>
+                  <test-case description="should accept valid ProfileName parameter" name="setup_profile Script Tests.Parameter Validation.should accept valid ProfileName parameter" time="0.2288" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should accept valid Repo path parameter" name="setup_profile Script Tests.Parameter Validation.should accept valid Repo path parameter" time="0.1384" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should accept switch parameters" name="setup_profile Script Tests.Parameter Validation.should accept switch parameters" time="0.0662" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>Expected a value, but got $null or empty.</message>
+                      <stack-trace>at $param | Should -Not -BeNullOrEmpty, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1:163
+at &lt;ScriptBlock&gt;, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1:163</stack-trace>
+                    </failure>
+                  </test-case>
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="setup_profile Script Tests.Script Execution Flow" executed="True" result="Failure" success="False" time="1.0604" asserts="0" description="setup_profile Script Tests.Script Execution Flow">
+                <results>
+                  <test-case description="should complete successfully in DryRun mode" name="setup_profile Script Tests.Script Execution Flow.should complete successfully in DryRun mode" time="0.0518" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>Expected a value, but got $null or empty.</message>
+                      <stack-trace>at $help | Should -Not -BeNullOrEmpty, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1:190
+at &lt;ScriptBlock&gt;, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1:190</stack-trace>
+                    </failure>
+                  </test-case>
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="setup_profile Script Tests.Error Handling" executed="True" result="Failure" success="False" time="1.2376" asserts="0" description="setup_profile Script Tests.Error Handling">
+                <results>
+                  <test-case description="should handle missing Update-WTProfile.ps1 script" name="setup_profile Script Tests.Error Handling.should handle missing Update-WTProfile.ps1 script" time="0.1607" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>Expected regular expression 'not found|does not exist|cannot find' to match $null, but it did not match.</message>
+                      <stack-trace>at $result | Should -Match "not found|does not exist|cannot find", C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1:202
+at &lt;ScriptBlock&gt;, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\setup_profile.Tests.ps1:202</stack-trace>
+                    </failure>
+                  </test-case>
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="setup_profile Script Tests.Integration Tests" executed="True" result="Success" success="True" time="1.266" asserts="0" description="setup_profile Script Tests.Integration Tests">
+                <results>
+                  <test-case description="should pass all parameters to Update-WTProfile.ps1" name="setup_profile Script Tests.Integration Tests.should pass all parameters to Update-WTProfile.ps1" time="0.0066" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should call Update-WTProfile.ps1 with correct parameters" name="setup_profile Script Tests.Integration Tests.should call Update-WTProfile.ps1 with correct parameters" time="0.0044" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should check exit code from Update-WTProfile.ps1" name="setup_profile Script Tests.Integration Tests.should check exit code from Update-WTProfile.ps1" time="0.0042" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="setup_profile Script Tests.Feature Flags" executed="True" result="Success" success="True" time="1.3012" asserts="0" description="setup_profile Script Tests.Feature Flags">
+                <results>
+                  <test-case description="should conditionally create desktop shortcut" name="setup_profile Script Tests.Feature Flags.should conditionally create desktop shortcut" time="0.0042" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should conditionally launch after setup" name="setup_profile Script Tests.Feature Flags.should conditionally launch after setup" time="0.0041" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should skip certain operations in DryRun mode" name="setup_profile Script Tests.Feature Flags.should skip certain operations in DryRun mode" time="0.0129" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\Update-WTProfile.Tests.ps1" executed="True" result="Failure" success="False" time="1.0384" asserts="0" description="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\Update-WTProfile.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="Update-WTProfile" executed="True" result="Failure" success="False" time="0.8504" asserts="0" description="Update-WTProfile">
+            <results>
+              <test-suite type="TestFixture" name="Update-WTProfile.Get-WTSettingsPath" executed="True" result="Success" success="True" time="0.1746" asserts="0" description="Update-WTProfile.Get-WTSettingsPath">
+                <results>
+                  <test-case description="should find Windows Terminal settings.json when it exists" name="Update-WTProfile.Get-WTSettingsPath.should find Windows Terminal settings.json when it exists" time="0.0971" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should throw when no settings.json found" name="Update-WTProfile.Get-WTSettingsPath.should throw when no settings.json found" time="0.0324" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should check stable, preview, and unpackaged locations in order" name="Update-WTProfile.Get-WTSettingsPath.should check stable, preview, and unpackaged locations in order" time="0.017" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Update-WTProfile.Backup-WTSettings" executed="True" result="Success" success="True" time="0.3848" asserts="0" description="Update-WTProfile.Backup-WTSettings">
+                <results>
+                  <test-case description="should create backup directory if it does not exist" name="Update-WTProfile.Backup-WTSettings.should create backup directory if it does not exist" time="0.0441" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should create timestamped backup file" name="Update-WTProfile.Backup-WTSettings.should create timestamped backup file" time="0.0351" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should copy settings content to backup" name="Update-WTProfile.Backup-WTSettings.should copy settings content to backup" time="0.0324" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Update-WTProfile.Build-StartupActions" executed="True" result="Failure" success="False" time="0.4586" asserts="0" description="Update-WTProfile.Build-StartupActions">
+                <results>
+                  <test-case description="should escape backslashes in repo path" name="Update-WTProfile.Build-StartupActions.should escape backslashes in repo path" time="0.0044" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should include all 10 pane titles" name="Update-WTProfile.Build-StartupActions.should include all 10 pane titles" time="0.0102" asserts="0" success="False" result="Failure" executed="True">
+                    <failure>
+                      <message>Expected regular expression '[regex]::Escape' to match 'new-tab -d "C:\\TestRepo" --title "Claude" --suppressApplicationTitle pwsh -NoExit -Command claude ; split-pane -V --size 0.5 -d "C:\\TestRepo" --title "Codex-2" --suppressApplicationTitle pwsh -NoExit -Command codex ; move-focus left ; split-pane -H --size 0.2 -d "C:\\TestRepo" --title "Codex-1" --suppressApplicationTitle pwsh -NoExit -Command codex ; move-focus up ; split-pane -H --size 0.25 -d "C:\\TestRepo" --title "aider-file_mod-1" --suppressApplicationTitle pwsh -NoExit -Command aider ; move-focus up ; split-pane -H --size 0.3333333 -d "C:\\TestRepo" --title "aider-file_mod-2" --suppressApplicationTitle pwsh -NoExit -Command aider ; move-focus up ; split-pane -H --size 0.5 -d "C:\\TestRepo" --title "aider-file_mod-3" --suppressApplicationTitle pwsh -NoExit -Command aider ; move-focus right ; split-pane -H --size 0.2 -d "C:\\TestRepo" --title "Codex-3" --suppressApplicationTitle pwsh -NoExit -Command codex ; move-focus up ; split-pane -H --size 0.25 -d "C:\\TestRepo" --title "aider-error_fix-1" --suppressApplicationTitle pwsh -NoExit -Command aider ; move-focus up ; split-pane -H --size 0.3333333 -d "C:\\TestRepo" --title "aider-error_fix-2" --suppressApplicationTitle pwsh -NoExit -Command aider ; move-focus up ; split-pane -H --size 0.5 -d "C:\\TestRepo" --title "aider-error_fix-3" --suppressApplicationTitle pwsh -NoExit -Command aider', because Claude, but it did not match.</message>
+                      <stack-trace>at $actions | Should -Match [regex]::Escape($title), C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\Update-WTProfile.Tests.ps1:125
+at &lt;ScriptBlock&gt;, C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\Update-WTProfile.Tests.ps1:125</stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case description="should include correct split-pane commands" name="Update-WTProfile.Build-StartupActions.should include correct split-pane commands" time="0.0159" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should include correct move-focus commands" name="Update-WTProfile.Build-StartupActions.should include correct move-focus commands" time="0.0177" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should suppress application title for all panes" name="Update-WTProfile.Build-StartupActions.should suppress application title for all panes" time="0.0044" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Update-WTProfile.Update-WTProfile" executed="True" result="Success" success="True" time="0.6001" asserts="0" description="Update-WTProfile.Update-WTProfile">
+                <results>
+                  <test-case description="should create new profile when it does not exist" name="Update-WTProfile.Update-WTProfile.should create new profile when it does not exist" time="0.032" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should update existing profile when it exists" name="Update-WTProfile.Update-WTProfile.should update existing profile when it exists" time="0.0238" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should enable persisted layout when switch is set" name="Update-WTProfile.Update-WTProfile.should enable persisted layout when switch is set" time="0.0114" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should set profile as default when switch is set" name="Update-WTProfile.Update-WTProfile.should set profile as default when switch is set" time="0.0104" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should set launchMode to fullscreen" name="Update-WTProfile.Update-WTProfile.should set launchMode to fullscreen" time="0.021" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should add icon to new profile" name="Update-WTProfile.Update-WTProfile.should add icon to new profile" time="0.0138" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Update-WTProfile.Test-JsonValid" executed="True" result="Success" success="True" time="0.6508" asserts="0" description="Update-WTProfile.Test-JsonValid">
+                <results>
+                  <test-case description="should return true for valid JSON" name="Update-WTProfile.Test-JsonValid.should return true for valid JSON" time="0.0052" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should return false for invalid JSON" name="Update-WTProfile.Test-JsonValid.should return false for invalid JSON" time="0.0187" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should return true for complex nested JSON" name="Update-WTProfile.Test-JsonValid.should return true for complex nested JSON" time="0.0034" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Update-WTProfile.Integration: Full Profile Update Workflow" executed="True" result="Success" success="True" time="0.7364" asserts="0" description="Update-WTProfile.Integration: Full Profile Update Workflow">
+                <results>
+                  <test-case description="should successfully create complete profile with all features" name="Update-WTProfile.Integration: Full Profile Update Workflow.should successfully create complete profile with all features" time="0.0576" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-suite type="TestFixture" name="Update-WTProfile.Error Handling" executed="True" result="Success" success="True" time="0.789" asserts="0" description="Update-WTProfile.Error Handling">
+                <results>
+                  <test-case description="should handle missing profiles structure gracefully" name="Update-WTProfile.Error Handling.should handle missing profiles structure gracefully" time="0.0091" asserts="0" success="True" result="Success" executed="True" />
+                  <test-case description="should handle missing profiles.list gracefully" name="Update-WTProfile.Error Handling.should handle missing profiles.list gracefully" time="0.0205" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+      <test-suite type="TestFixture" name="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\WT-10Pane-Layout.Tests.ps1" executed="True" result="Success" success="True" time="0.2866" asserts="0" description="C:\Users\Richard Wilks\CLI_RESTART\10_bands\Tests\WT-10Pane-Layout.Tests.ps1">
+        <results>
+          <test-suite type="TestFixture" name="WT-10Pane-Layout Build-WtArgs" executed="True" result="Success" success="True" time="0.1602" asserts="0" description="WT-10Pane-Layout Build-WtArgs">
+            <results>
+              <test-suite type="TestFixture" name="WT-10Pane-Layout Build-WtArgs.Tool presence diagnostics" executed="True" result="Success" success="True" time="0.1123" asserts="0" description="WT-10Pane-Layout Build-WtArgs.Tool presence diagnostics">
+                <results>
+                  <test-case description="returns $false when a tool is missing" name="WT-10Pane-Layout Build-WtArgs.Tool presence diagnostics.returns $false when a tool is missing" time="0.0191" asserts="0" success="True" result="Success" executed="True" />
+                </results>
+              </test-suite>
+              <test-case description="builds args with repo, fullscreen and window target" name="WT-10Pane-Layout Build-WtArgs.builds args with repo, fullscreen and window target" time="0.0063" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="has exactly 10 pane titles and 1 new-tab + 9 split-pane" name="WT-10Pane-Layout Build-WtArgs.has exactly 10 pane titles and 1 new-tab + 9 split-pane" time="0.0284" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="uses one vertical split and eight horizontal splits for a 2x5 grid" name="WT-10Pane-Layout Build-WtArgs.uses one vertical split and eight horizontal splits for a 2x5 grid" time="0.0087" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="applies the expected move-focus sequence for stable splitting" name="WT-10Pane-Layout Build-WtArgs.applies the expected move-focus sequence for stable splitting" time="0.0047" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="includes expected launch commands for claude/codex/aider with pwsh -NoExit -Command" name="WT-10Pane-Layout Build-WtArgs.includes expected launch commands for claude/codex/aider with pwsh -NoExit -Command" time="0.0043" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="passes -d for each pane/split (11 total) and each is quoted" name="WT-10Pane-Layout Build-WtArgs.passes -d for each pane/split (11 total) and each is quoted" time="0.0172" asserts="0" success="True" result="Success" executed="True" />
+              <test-case description="sets --suppressApplicationTitle for every titled pane (10 total)" name="WT-10Pane-Layout Build-WtArgs.sets --suppressApplicationTitle for every titled pane (10 total)" time="0.0083" asserts="0" success="True" result="Success" executed="True" />
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+    </results>
+  </test-suite>
+</test-results>

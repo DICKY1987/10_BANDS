@@ -1,0 +1,26 @@
+{
+  "Git: fetch & prune": {
+    "tool": "git",
+    "args": [
+      "fetch",
+      "--all",
+      "--prune"
+    ]
+  },
+  "Git: status -sb": {
+    "tool": "git",
+    "args": [
+      "status",
+      "-sb"
+    ]
+  },
+  "Quality Gate": {
+    "tool": "pwsh",
+    "args": [
+      "-NoProfile",
+      "-File",
+      "scripts/run_quality.ps1"
+    ],
+    "timeout_sec": 1800
+  }
+}
