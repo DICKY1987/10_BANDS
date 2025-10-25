@@ -15,10 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup PowerShell 7.x
-        uses: actions/setup-powershell@v2
-        with:
-          powerShellVersion: '7.3.x'
+      # Windows runners already have PowerShell 7.x pre-installed
 
       - name: Install Pester
         shell: pwsh
