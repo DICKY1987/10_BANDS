@@ -1,195 +1,422 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import os, sys, json, subprocess, shutil, time
-from datetime import datetime, timezone
+import logging
+import os
+import re
+import shutil
+import subprocess
+import sys
+import json
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 APP_TITLE = "Headless Queue Manager (v2)"
 
-# Derive a sensible default repo path (two levels up from this file)
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_REPO = os.path.abspath(os.path.join(_THIS_DIR, "..", ".."))
-
-# Path roots (may be overridden by SharedConfig.psd1 Paths section)
-DEF_TASKS = ".tasks"
-DEF_LOGS = "logs"
-STATE_DIR = ".state"
-
-# Optional template search path (auto-loaded if exists)
+# Paths and defaults
+DEFAULT_REPO = os.getcwd()
+STATE_DIR = os.path.join(".10bands_state")
 DEFAULT_TEMPLATES_REL = os.path.join("Config", "TaskTemplates.json")
 
+GUI_LOG_NAME = "QueueManagerGUI.log"
+GUI_LOG_MAX_FILES = 10
+GUI_LOG_MAX_SIZE = 50 * 1024 * 1024  # 50 MB
+
+DEFAULT_TOOL_FALLBACK = ["git", "aider", "codex", "claude", "pwsh", "python"]
+
+BASE_DIR = Path(__file__).resolve().parent
+
+CONFIG_TOOL_FILES = (
+    os.path.join("Config", "CliToolsConfig.psd1"),
+    "SharedConfig.psd1",
+)
+
+def setup_logging(base_dir: Path) -> Path:
+    """Initialise a simple rotating log for the GUI."""
+
+    logs_root = base_dir / STATE_DIR
+    logs_root.mkdir(parents=True, exist_ok=True)
+    log_path = logs_root / GUI_LOG_NAME
+
+    # Rotate if too large
+    if log_path.exists() and log_path.stat().st_size > GUI_LOG_MAX_SIZE:
+        for idx in range(GUI_LOG_MAX_FILES - 1, 0, -1):
+            older = logs_root / f"{GUI_LOG_NAME}.{idx}"
+            newer = logs_root / (f"{GUI_LOG_NAME}.{idx - 1}" if idx - 1 else GUI_LOG_NAME)
+            if older.exists():
+                older.unlink(missing_ok=True)
+            if newer.exists():
+                newer.rename(older)
+        log_path = logs_root / GUI_LOG_NAME
+
+    logging.basicConfig(
+        filename=str(log_path),
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    logging.info("GUI logging initialised at %s", log_path)
+    return log_path
+
+def parse_tool_whitelist(text: str) -> set[str]:
+    names = set()
+    for match in re.finditer(r"Name\\s*=\\s*'([^']+)'", text):
+        names.add(match.group(1).strip())
+    # Support simple arrays: ToolWhitelist = @('git','pwsh')
+    array_match = re.findall(r"@\\(([^)]*)\\)", text, re.MULTILINE | re.DOTALL)
+    for segment in array_match:
+        for raw in re.findall(r"'([^']+)'", segment):
+            if re.match(r"^[A-Za-z0-9_\\-]+$", raw):
+                names.add(raw.strip())
+    return names
+
+def load_tool_whitelist(base_dir: Path) -> tuple[list[str], list[str]]:
+    """Return (tools, errors)."""
+
+    discovered: set[str] = set()
+    errors: list[str] = []
+    for rel in CONFIG_TOOL_FILES:
+        path = base_dir / rel
+        if not path.exists():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception as exc:
+            errors.append(f"{path.name}: {exc}")
+            logging.error("Failed to read %s: %s", path, exc)
+            continue
+        parsed = parse_tool_whitelist(text)
+        if not parsed:
+            errors.append(f"{path.name}: no tool names detected")
+        discovered.update(parsed)
+    tools = sorted(discovered) if discovered else list(DEFAULT_TOOL_FALLBACK)
+    return tools, errors
+
+@dataclass
+class TemplateRecord:
+    name: str
+    task: dict
+    category: str = "General"
+    description: str = ""
+    source: str = "builtin"  # builtin | custom | external
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "category": self.category,
+            "description": self.description,
+            "task": self.task,
+            "source": self.source,
+        }
 
 class LogTailer(QtCore.QObject):
     new_lines = QtCore.pyqtSignal(list)
 
-    def __init__(self, path: str, poll_ms: int = 700, parent=None):
-        super().__init__(parent)
-        self.path = path
-        self.poll_ms = poll_ms
-        self._timer = QtCore.QTimer(self)
+    def __init__(self, path: str | None = None):
+        super().__init__()
+        self.path = path or ""
+        self._timer = QtCore.QTimer()
         self._timer.timeout.connect(self._poll)
-        self._pos = 0
-        self._inode = None
+        self._file = None
 
     def start(self):
-        self._timer.start(self.poll_ms)
+        self._timer.start(1000)
 
     def stop(self):
         self._timer.stop()
+        if self._file:
+            self._file.close()
+            self._file = None
 
     def _poll(self):
+        if not self.path:
+            return
         try:
-            if not os.path.exists(self.path):
-                return
-            st = os.stat(self.path)
-            inode = (st.st_dev, getattr(st, "st_ino", st.st_size))
-            if self._inode != inode or st.st_size < self._pos:
-                self._pos = 0
-                self._inode = inode
-            with open(self.path, "r", encoding="utf-8", errors="replace") as f:
-                f.seek(self._pos)
-                chunk = f.read()
-                self._pos = f.tell()
-            if not chunk:
-                return
-            lines = [ln.rstrip() for ln in chunk.splitlines() if ln.strip()]
+            if not self._file:
+                self._file = open(self.path, "r", encoding="utf-8", errors="ignore")
+                self._file.seek(0, os.SEEK_END)
+            lines = self._file.read().splitlines()
             if lines:
                 self.new_lines.emit(lines)
         except Exception:
             pass
 
-
 def color_for_line(line: str) -> str:
-    low = line.lower()
-    if (
-        "error" in low
-        or "[error]" in low
-        or " fail " in low
-        or low.endswith(" fail")
-        or "timeout" in low
-    ):
-        return "#ff4444"
-    if "warn" in low:
-        return "#ffaa00"
-    if "ok" in low or "success" in low or "quality gate: ok" in low:
-        return "#44bb44"
+    if "ERROR" in line or "Exception" in line:
+        return "#ff8080"
+    if "WARNING" in line:
+        return "#ffd480"
     return "#cccccc"
 
+class TemplateMetaDialog(QtWidgets.QDialog):
+    def __init__(self, categories: list[str], metadata: dict | None = None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Template Details")
+        layout = QtWidgets.QFormLayout(self)
 
-def get_tool_names_from_config(repo_path: str) -> list[str]:
-    config_path = os.path.join(repo_path, "Config", "CliToolsConfig.psd1")
-    if not os.path.exists(config_path):
-        return []
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        # This is a simplified parser for .psd1 files. It's not a full-fledged
-        # PowerShell parser, but it's good enough for this specific file format.
-        import re
-        tool_names = re.findall(r"Name\s*=\s*\'(.*?)\'", content)
-        return tool_names
-    except Exception:
-        return []
+        self.nameEdit = QtWidgets.QLineEdit()
+        self.categoryEdit = QtWidgets.QComboBox()
+        self.categoryEdit.setEditable(True)
+        self.categoryEdit.addItems(sorted({*categories, "General"}))
+        self.descEdit = QtWidgets.QPlainTextEdit()
+        self.descEdit.setPlaceholderText("Describe what this template does…")
 
+        layout.addRow("Name", self.nameEdit)
+        layout.addRow("Category", self.categoryEdit)
+        layout.addRow("Description", self.descEdit)
 
-def _which(exe: str) -> str | None:
-    try:
-        return shutil.which(exe)
-    except Exception:
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+
+        if metadata:
+            self.nameEdit.setText(metadata.get("name", ""))
+            self.categoryEdit.setCurrentText(metadata.get("category", "General"))
+            self.descEdit.setPlainText(metadata.get("description", ""))
+
+    def metadata(self) -> dict:
+        return {
+            "name": self.nameEdit.text().strip(),
+            "category": self.categoryEdit.currentText().strip() or "General",
+            "description": self.descEdit.toPlainText().strip(),
+        }
+
+class TemplatesModel(QtCore.QObject):
+    changed = QtCore.pyqtSignal()
+
+    def __init__(self, state_dir: Path, parent=None):
+        super().__init__(parent)
+        self.state_dir = state_dir
+        self.custom_path = self.state_dir / "CustomTemplates.json"
+        self.records: list[TemplateRecord] = []
+        self.load_builtin_defaults()
+        self.load_custom()
+
+    # ----- Loading & persistence -----
+    def load_builtin_defaults(self):
+        defaults = [
+            TemplateRecord(
+                name="Git: fetch + prune",
+                category="Git",
+                description="Fetch all remotes, prune stale refs.",
+                task={"tool": "git", "args": ["fetch", "--all", "--prune"]},
+                source="builtin",
+            ),
+            TemplateRecord(
+                name="Git: status -sb",
+                category="Git",
+                description="Compact status overview for active repo.",
+                task={"tool": "git", "args": ["status", "-sb"]},
+                source="builtin",
+            ),
+            TemplateRecord(
+                name="Quality Gate",
+                category="Quality",
+                description="Run PowerShell quality checks.",
+                task={
+                    "tool": "pwsh",
+                    "args": ["-NoProfile", "-File", "scripts/run_quality.ps1"],
+                    "timeout_sec": 1800,
+                },
+                source="builtin",
+            ),
+            TemplateRecord(
+                name="Aider: refactor stub",
+                category="AI",
+                description="Invoke aider with a boilerplate refactor prompt.",
+                task={
+                    "tool": "aider",
+                    "flags": ["--yes"],
+                    "prompt": "Refactor module for better dependency injection.",
+                    "timeout_sec": 1200,
+                },
+                source="builtin",
+            ),
+        ]
+        self.records = defaults
+        self.changed.emit()
+
+    def load_external_json(self, path: Path):
+        if not path.exists():
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except Exception as exc:
+            logging.error("Unable to load templates from %s: %s", path, exc)
+            return
+
+        new_records: list[TemplateRecord] = []
+        if isinstance(data, dict) and "templates" in data:
+            source_entries = data["templates"]
+        else:
+            source_entries = data
+
+        if isinstance(source_entries, dict):
+            for name, task in source_entries.items():
+                new_records.append(
+                    TemplateRecord(name=name, task=task, category="General", source="external")
+                )
+        elif isinstance(source_entries, list):
+            for item in source_entries:
+                if not isinstance(item, dict):
+                    continue
+                task = item.get("task", {})
+                name = item.get("name") or item.get("title") or "Template"
+                new_records.append(
+                    TemplateRecord(
+                        name=name,
+                        task=task,
+                        category=item.get("category", "General"),
+                        description=item.get("description", ""),
+                        source="external",
+                    )
+                )
+
+        # Remove previous external records and extend
+        self.records = [rec for rec in self.records if rec.source != "external"] + new_records
+        self.changed.emit()
+
+    def load_custom(self):
+        if not self.custom_path.exists():
+            return
+        try:
+            with open(self.custom_path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except Exception as exc:
+            logging.error("Unable to load custom templates: %s", exc)
+            return
+
+        new_records: list[TemplateRecord] = []
+        items = data.get("templates") if isinstance(data, dict) else data
+        if isinstance(items, list):
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("name")
+                task = item.get("task", {})
+                if not name or not isinstance(task, dict):
+                    continue
+                new_records.append(
+                    TemplateRecord(
+                        name=name,
+                        task=task,
+                        category=item.get("category", "General"),
+                        description=item.get("description", ""),
+                        source="custom",
+                    )
+                )
+        self.records = [rec for rec in self.records if rec.source != "custom"] + new_records
+        self.changed.emit()
+
+    def save_custom(self):
+        payload = {
+            "templates": [rec.to_dict() for rec in self.records if rec.source == "custom"],
+        }
+        try:
+            self.custom_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.custom_path, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2, ensure_ascii=False)
+        except Exception as exc:
+            logging.error("Unable to persist custom templates: %s", exc)
+
+    # ----- Queries -----
+    def available_categories(self) -> list[str]:
+        return sorted({rec.category for rec in self.records} or {"General"})
+
+    def grouped(self) -> dict[str, list[TemplateRecord]]:
+        groups: dict[str, list[TemplateRecord]] = defaultdict(list)
+        for rec in self.records:
+            groups[rec.category].append(rec)
+        for recs in groups.values():
+            recs.sort(key=lambda r: r.name.lower())
+        return dict(sorted(groups.items(), key=lambda kv: kv[0].lower()))
+
+    def get(self, name: str, category: str) -> TemplateRecord | None:
+        for rec in self.records:
+            if rec.name == name and rec.category == category:
+                return rec
         return None
 
+    # ----- Mutations -----
+    def save_template(self, metadata: dict, task: dict):
+        rec = TemplateRecord(
+            name=metadata.get("name", "Unnamed"),
+            task=task,
+            category=metadata.get("category", "General") or "General",
+            description=metadata.get("description", ""),
+            source="custom",
+        )
+        self.records = [
+            existing
+            for existing in self.records
+            if not (existing.name == rec.name and existing.category == rec.category)
+            or existing.source != "custom"
+        ]
+        self.records.append(rec)
+        self.save_custom()
+        self.changed.emit()
 
-def _read_shared_paths_from_ps(repo_path: str) -> dict | None:
-    """Attempt to import SharedConfig.psd1 via PowerShell and return Paths as dict.
+    def delete_template(self, name: str, category: str):
+        removed = False
+        filtered: list[TemplateRecord] = []
+        for rec in self.records:
+            if rec.name == name and rec.category == category and rec.source == "custom":
+                removed = True
+                continue
+            filtered.append(rec)
+        if removed:
+            self.records = filtered
+            self.save_custom()
+            self.changed.emit()
 
-    Prefers pwsh, falls back to Windows powershell if available.
-    """
-    psd1 = os.path.join(repo_path, "SharedConfig.psd1")
-    if not os.path.exists(psd1):
-        return None
-    pwsh = _which("pwsh")
-    ps5 = _which("powershell")
-    shell = pwsh or ps5
-    if not shell:
-        return None
-    cmd = [
-        shell,
-        "-NoProfile",
-        "-Command",
-        f"$x=Import-PowerShellDataFile -Path '{psd1}'; $x.Paths | ConvertTo-Json -Compress",
-    ]
-    try:
-        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
-        data = json.loads(out.decode("utf-8", "ignore"))
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        return None
-    return None
-
-
-def _read_shared_paths_fallback(repo_path: str) -> dict | None:
-    """Very small regex-based parser for the Paths block in SharedConfig.psd1.
-
-    Handles single-quoted string values for TasksRoot/LogsRoot/StateRoot.
-    """
-    psd1 = os.path.join(repo_path, "SharedConfig.psd1")
-    if not os.path.exists(psd1):
-        return None
-    try:
-        txt = open(psd1, "r", encoding="utf-8").read()
-    except Exception:
-        return None
-    import re
-    paths_block = {}
-    for key in ("TasksRoot", "LogsRoot", "StateRoot"):
-        m = re.search(rf"{key}\s*=\s*'([^']+)'", txt)
-        if m:
-            paths_block[key] = m.group(1)
-    return paths_block or None
-
-
-def get_shared_paths(repo_path: str) -> dict:
-    """Return a dict with TasksRoot/LogsRoot/StateRoot resolved to absolute paths."""
-    paths = _read_shared_paths_from_ps(repo_path) or _read_shared_paths_fallback(repo_path) or {}
-    tasks = paths.get("TasksRoot", DEF_TASKS)
-    logs = paths.get("LogsRoot", DEF_LOGS)
-    state = paths.get("StateRoot", STATE_DIR)
-    # Resolve relative to repo root if needed
-    if not os.path.isabs(tasks):
-        tasks = os.path.join(repo_path, tasks)
-    if not os.path.isabs(logs):
-        logs = os.path.join(repo_path, logs)
-    if not os.path.isabs(state):
-        state = os.path.join(repo_path, state)
-    return {"TasksRoot": tasks, "LogsRoot": logs, "StateRoot": state}
+    def set_state_dir(self, state_dir: Path):
+        if self.state_dir == state_dir:
+            return
+        self.state_dir = state_dir
+        self.custom_path = self.state_dir / "CustomTemplates.json"
+        self.load_custom()
 
 class AddTaskDialog(QtWidgets.QDialog):
-    def __init__(self, repo_path: str, tool_names: list[str], seed: dict | None = None, parent=None):
+    def __init__(self,
+        repo_path: str,
+        tools: list[str],
+        save_template_cb=None,
+        seed: dict | None = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("Add Task (JSONL)")
         self.setModal(True)
         self.repo_path = repo_path
+        self.save_template_cb = save_template_cb
         layout = QtWidgets.QFormLayout(self)
 
         self.tool = QtWidgets.QComboBox()
-        self.tool.addItems(tool_names)
+        if tools:
+            self.tool.addItems(tools)
+        else:
+            self.tool.addItems(["git", "aider", "codex", "claude", "pwsh", "python"])
         self.repo = QtWidgets.QLineEdit(repo_path)
         self.args = QtWidgets.QLineEdit()
         self.flags = QtWidgets.QLineEdit()
-        self.files = QtWidgets.QLineEdit()
         self.prompt = QtWidgets.QPlainTextEdit()
         self.timeout = QtWidgets.QSpinBox()
         self.timeout.setRange(0, 86400)
-        self.timeout.setValue(900)
+        self.timeout.setValue(600)
 
         layout.addRow("Tool", self.tool)
         layout.addRow("Repo", self.repo)
-        layout.addRow("Args (space-separated)", self.args)
-        layout.addRow("Flags (space-separated)", self.flags)
-        layout.addRow("Files (comma-separated)", self.files)
-        layout.addRow("Prompt (optional)", self.prompt)
-        layout.addRow("Timeout (sec, 0 = none)", self.timeout)
+        layout.addRow("Args", self.args)
+        layout.addRow("Flags", self.flags)
+        layout.addRow("Prompt", self.prompt)
+        layout.addRow("Timeout (s)", self.timeout)
 
         btns = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok
@@ -199,655 +426,611 @@ class AddTaskDialog(QtWidgets.QDialog):
         btns.rejected.connect(self.reject)
         layout.addRow(btns)
 
+        if self.save_template_cb:
+            self.btnSaveTemplate = btns.addButton(
+                "Save as Template", QtWidgets.QDialogButtonBox.ButtonRole.ActionRole
+            )
+            self.btnSaveTemplate.clicked.connect(self.save_as_template)
+
         if seed:
             self.apply_seed(seed)
+
+    def save_as_template(self):
+        if not self.save_template_cb:
+            return
+        task = self.build_task()
+        if not task:
+            return
+        meta = TemplateMetaDialog(
+            self.save_template_cb.available_categories(),
+            parent=self,
+        )
+        if meta.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            details = meta.metadata()
+            if not details["name"]:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Template Name Required",
+                    "Please provide a descriptive template name before saving.",
+                )
+                return
+            try:
+                self.save_template_cb.save_template(details, task)
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Template Saved",
+                    f"Template '{details['name']}' saved under {details['category']}.",
+                )
+            except Exception as exc:
+                logging.exception("Failed saving template")
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Save Failed",
+                    f"Unable to save template: {exc}\n"
+                    "Check file permissions for the state templates directory.",
+                )
 
     def apply_seed(self, seed: dict):
         def join_list(v):
             return " ".join(v) if isinstance(v, list) else (v or "")
-
-        if "tool" in seed:
-            self.tool.setCurrentText(str(seed["tool"]))
-        if "repo" in seed:
-            self.repo.setText(str(seed["repo"]))
-        if "args" in seed:
-            self.args.setText(join_list(seed["args"]))
-        if "flags" in seed:
-            self.flags.setText(join_list(seed["flags"]))
-        if "files" in seed:
-            self.files.setText(
-                ", ".join(seed["files"]) if isinstance(seed["files"], list) else str(seed["files"])
-            )
-        if "prompt" in seed:
-            self.prompt.setPlainText(str(seed["prompt"]))
-        if "timeout_sec" in seed:
-            try:
-                self.timeout.setValue(int(seed["timeout_sec"]))
-            except:
-                pass
+        self.tool.setCurrentText(seed.get("tool", ""))
+        self.repo.setText(seed.get("repo", self.repo_path))
+        self.args.setText(join_list(seed.get("args", "")))
+        self.flags.setText(join_list(seed.get("flags", "")))
+        self.prompt.setPlainText(seed.get("prompt", ""))
+        self.timeout.setValue(seed.get("timeout_sec", 600))
 
     def build_task(self) -> dict:
-        task = {
-            "id": datetime.now().strftime("%Y%m%d%H%M%S"),
-            "tool": self.tool.currentText(),
-            "repo": self.repo.text().strip() or self.repo_path,
-            "timeout_sec": int(self.timeout.value()),
-        }
-        if self.args.text().strip():
-            task["args"] = self.args.text().strip().split()
-        if self.flags.text().strip():
-            task["flags"] = self.flags.text().strip().split()
-        if self.files.text().strip():
-            task["files"] = [p.strip() for p in self.files.text().split(",") if p.strip()]
-        ptxt = self.prompt.toPlainText().strip()
-        if ptxt:
-            task["prompt"] = ptxt
+        task = {}
+        t = self.tool.currentText().strip()
+        if t:
+            task["tool"] = t
+        repo = self.repo.text().strip()
+        if repo:
+            task["repo"] = repo
+        args = self.args.text().strip()
+        if args:
+            task["args"] = args.split()
+        flags = self.flags.text().strip()
+        if flags:
+            task["flags"] = flags.split()
+        prompt = self.prompt.toPlainText().strip()
+        if prompt:
+            task["prompt"] = prompt
+        timeout = int(self.timeout.value())
+        if timeout > 0:
+            task["timeout_sec"] = timeout
         return task
 
-
-class TemplatesModel(QtCore.QObject):
-    changed = QtCore.pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.templates = {}  # name -> dict
-
-    def load(self, path: str):
-        try:
-            data = json.load(open(path, "r", encoding="utf-8"))
-            if isinstance(data, list):
-                # list of {name, task}
-                self.templates = {
-                    item.get("name", f"Template {i + 1}"): item.get("task", {})
-                    for i, item in enumerate(data)
-                }
-            elif isinstance(data, dict):
-                self.templates = data
-            self.changed.emit()
-        except Exception:
-            pass
-
-    def builtin(self):
-        self.templates = {
-            "Git: fetch + prune": {"tool": "git", "args": ["fetch", "--all", "--prune"]},
-            "Git: status -sb": {"tool": "git", "args": ["status", "-sb"]},
-            "Quality Gate": {
-                "tool": "pwsh",
-                "args": ["-NoProfile", "-File", "scripts/run_quality.ps1"],
-                "timeout_sec": 1800,
-            },
-            "Aider: refactor stub": {
-                "tool": "aider",
-                "flags": ["--yes"],
-                "prompt": "Refactor module for better dependency injection.",
-                "timeout_sec": 1200,
-            },
+    def save_custom(self):
+        payload = {
+            "templates": [rec.to_dict() for rec in self.records if rec.source == "custom"],
         }
+        try:
+            self.custom_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.custom_path, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2, ensure_ascii=False)
+        except Exception as exc:
+            logging.error("Unable to persist custom templates: %s", exc)
+
+    # ----- Queries -----
+    def available_categories(self) -> list[str]:
+        return sorted({rec.category for rec in self.records} or {"General"})
+
+    def grouped(self) -> dict[str, list[TemplateRecord]]:
+        groups: dict[str, list[TemplateRecord]] = defaultdict(list)
+        for rec in self.records:
+            groups[rec.category].append(rec)
+        for recs in groups.values():
+            recs.sort(key=lambda r: r.name.lower())
+        return dict(sorted(groups.items(), key=lambda kv: kv[0].lower()))
+
+    def get(self, name: str, category: str) -> TemplateRecord | None:
+        for rec in self.records:
+            if rec.name == name and rec.category == category:
+                return rec
+        return None
+
+    # ----- Mutations -----
+    def save_template(self, metadata: dict, task: dict):
+        rec = TemplateRecord(
+            name=metadata.get("name", "Unnamed"),
+            task=task,
+            category=metadata.get("category", "General") or "General",
+            description=metadata.get("description", ""),
+            source="custom",
+        )
+        self.records = [
+            existing
+            for existing in self.records
+            if not (existing.name == rec.name and existing.category == rec.category)
+            or existing.source != "custom"
+        ]
+        self.records.append(rec)
+        self.save_custom()
         self.changed.emit()
 
+    def delete_template(self, name: str, category: str):
+        removed = False
+        filtered: list[TemplateRecord] = []
+        for rec in self.records:
+            if rec.name == name and rec.category == category and rec.source == "custom":
+                removed = True
+                continue
+            filtered.append(rec)
+        if removed:
+            self.records = filtered
+            self.save_custom()
+            self.changed.emit()
+
+    def set_state_dir(self, state_dir: Path):
+        if self.state_dir == state_dir:
+            return
+        self.state_dir = state_dir
+        self.custom_path = self.state_dir / "CustomTemplates.json"
+        self.load_custom()
+
+class TemplateManagerDialog(QtWidgets.QDialog):
+    def __init__(self,
+        manager: TemplatesModel,
+        tools: list[str],
+        repo_provider,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle("Manage Templates")
+        self.manager = manager
+        self.tools = tools
+        self.repo_provider = repo_provider
+
+        layout = QtWidgets.QVBoxLayout(self)
+        self.tree = QtWidgets.QTreeWidget()
+        self.tree.setHeaderLabels(["Template", "Description", "Source"])
+        self.tree.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.tree.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.tree.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self.tree, 1)
+
+        btn_box = QtWidgets.QHBoxLayout()
+        self.btnNew = QtWidgets.QPushButton("New")
+        self.btnEdit = QtWidgets.QPushButton("Edit")
+        self.btnDelete = QtWidgets.QPushButton("Delete")
+        self.btnClose = QtWidgets.QPushButton("Close")
+        btn_box.addWidget(self.btnNew)
+        btn_box.addWidget(self.btnEdit)
+        btn_box.addWidget(self.btnDelete)
+        btn_box.addStretch(1)
+        btn_box.addWidget(self.btnClose)
+        layout.addLayout(btn_box)
+
+        self.btnClose.clicked.connect(self.accept)
+        self.btnNew.clicked.connect(self.create_template)
+        self.btnEdit.clicked.connect(self.edit_template)
+        self.btnDelete.clicked.connect(self.delete_template)
+
+        self.manager.changed.connect(self.populate)
+        self.populate()
+
+    def populate(self):
+        self.tree.clear()
+        for category, templates in self.manager.grouped().items():
+            cat_item = QtWidgets.QTreeWidgetItem([category])
+            cat_item.setFirstColumnSpanned(True)
+            self.tree.addTopLevelItem(cat_item)
+            for rec in templates:
+                child = QtWidgets.QTreeWidgetItem([
+                    rec.name, rec.description or "", rec.source.title()
+                ])
+                child.setData(0, QtCore.Qt.ItemDataRole.UserRole, (rec.name, rec.category))
+                cat_item.addChild(child)
+            cat_item.setExpanded(True)
+
+    def selected_record(self) -> TemplateRecord | None:
+        item = self.tree.currentItem()
+        if not item or not item.parent():
+            return None
+        key = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
+        if not key:
+            return None
+        name, category = key
+        return self.manager.get(name, category)
+
+    def create_template(self):
+        self.launch_editor(None)
+
+    def edit_template(self):
+        rec = self.selected_record()
+        if not rec:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Select Template",
+                "Choose a template to edit.",
+            )
+            return
+        self.launch_editor(rec)
+
+    def launch_editor(self, record: TemplateRecord | None):
+        seed = record.task if record else None
+        dlg = AddTaskDialog(
+            repo_path=self.repo_provider() or "",
+            tools=self.tools,
+            save_template_cb=self.manager,
+            seed=seed,
+            parent=self,
+        )
+        if record:
+            dlg.setWindowTitle(f"Edit Template: {record.name}")
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            task = dlg.build_task()
+            meta = TemplateMetaDialog(
+                self.manager.available_categories(),
+                metadata={
+                    "name": record.name if record else "",
+                    "category": record.category if record else "General",
+                    "description": record.description if record else "",
+                }
+                if record
+                else None,
+                parent=self,
+            )
+            if meta.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+                details = meta.metadata()
+                if record and record.source != "custom":
+                    details["name"] = f"{record.name} (Custom Copy)"
+                self.manager.save_template(details, task)
+
+    def delete_template(self):
+        rec = self.selected_record()
+        if not rec:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Select Template",
+                "Choose a custom template to delete.",
+            )
+            return
+        if rec.source != "custom":
+            QtWidgets.QMessageBox.information(
+                self,
+                "Read-only Template",
+                "Built-in and external templates cannot be deleted."
+                " Create a copy instead.",
+            )
+            return
+        confirm = QtWidgets.QMessageBox.question(
+            self,
+            "Confirm Deletion",
+            f"Delete template '{rec.name}' from {rec.category}?",
+        )
+        if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
+            self.manager.delete_template(rec.name, rec.category)
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
+        self.baseDir = BASE_DIR
+        self.settings = QtCore.QSettings("10_Bands", "QueueManagerGUI")
+        self.toolList, self.toolErrors = load_tool_whitelist(self.baseDir)
+        self.configWatcher = QtCore.QFileSystemWatcher(self)
+        self.configWatcher.fileChanged.connect(self.reload_tool_list)
+        self.configWatcher.directoryChanged.connect(self.reload_tool_list)
+        watch_paths = []
+        for rel in CONFIG_TOOL_FILES:
+            p = (self.baseDir / rel).resolve()
+            if p.exists():
+                watch_paths.append(str(p))
+        if watch_paths:
+            self.configWatcher.addPaths(watch_paths)
+
         self.setWindowTitle(APP_TITLE)
         self.resize(1320, 860)
-        self._lastStopAt = 0.0
-        self._cooldownSec = 3
 
         # === Top paths & control ===
-        self.repoEdit = QtWidgets.QLineEdit(DEFAULT_REPO)
-        self.tasksEdit = QtWidgets.QLineEdit("")
-        self.logsEdit = QtWidgets.QLineEdit("")
+        repo_default = self.settings.value("paths/repo", DEFAULT_REPO)
+        tasks_default = self.settings.value("paths/tasks", "")
+        logs_default = self.settings.value("paths/logs", "")
+        self.repoEdit = QtWidgets.QLineEdit(str(repo_default))
+        self.tasksEdit = QtWidgets.QLineEdit(str(tasks_default))
+        self.logsEdit = QtWidgets.QLineEdit(str(logs_default))
         self.btnRepo = QtWidgets.QPushButton("Repo…")
         self.btnRepo.clicked.connect(self.choose_repo)
         self.btnTasks = QtWidgets.QPushButton(".tasks…")
         self.btnTasks.clicked.connect(self.choose_tasks)
-        self.btnLogs = QtWidgets.QPushButton("logs…")
+        self.btnLogs = QtWidgets.QPushButton("Logs…")
         self.btnLogs.clicked.connect(self.choose_logs)
+
         self.btnStart = QtWidgets.QPushButton("Start Worker")
         self.btnStop = QtWidgets.QPushButton("Stop Worker")
-        self.btnAdd = QtWidgets.QPushButton("Add Task")
+        self.btnAdd = QtWidgets.QPushButton("Enqueue Task")
         self.btnRetryFailed = QtWidgets.QPushButton("Retry Failed → Inbox")
         self.btnOpenTasks = QtWidgets.QPushButton("Open .tasks")
         self.btnOpenLogs = QtWidgets.QPushButton("Open logs")
-        # Extra controls (clear log, refresh views)
-        self.btnClearLog = QtWidgets.QPushButton("Clear Log")
-        self.btnRefreshLedger = QtWidgets.QPushButton("Refresh Ledger")
-        self.btnRefreshDLQ = QtWidgets.QPushButton("Refresh DLQ")
-        self.btnRefreshCB = QtWidgets.QPushButton("Refresh CB")
-        self.btnForceCloseCB = QtWidgets.QPushButton("Force Close CB")
-        self.btnRetrySelectedDLQ = QtWidgets.QPushButton("Retry Selected")
-        self.btnDeleteSelectedDLQ = QtWidgets.QPushButton("Delete Selected")
+        self.btnLaunchTerminal = QtWidgets.QPushButton("Launch Terminal Layout")
         self.btnStart.clicked.connect(self.start_worker)
         self.btnStop.clicked.connect(self.stop_worker)
         self.btnAdd.clicked.connect(self.add_task)
         self.btnRetryFailed.clicked.connect(self.retry_failed)
         self.btnOpenTasks.clicked.connect(lambda: self.open_folder(self.tasks_dir()))
         self.btnOpenLogs.clicked.connect(lambda: self.open_folder(self.logs_dir()))
-        self.btnClearLog.clicked.connect(lambda: (hasattr(self, 'liveLog') and self.liveLog.clear()))
-        self.btnRefreshLedger.clicked.connect(self.load_ledger)
-        self.btnRefreshDLQ.clicked.connect(self.refresh_dlq)
-        self.btnRefreshCB.clicked.connect(self.refresh_breakers)
-        self.btnForceCloseCB.clicked.connect(self.force_close_breaker)
-        self.btnRetrySelectedDLQ.clicked.connect(self.retry_selected_dlq)
-        self.btnDeleteSelectedDLQ.clicked.connect(self.delete_selected_dlq)
+        self.btnLaunchTerminal.clicked.connect(self.launch_terminal_layout)
 
         # Filters
         self.filterTool = QtWidgets.QComboBox()
-        self.filterTool.addItems(["All", "git", "aider", "codex", "claude", "pwsh", "python"])
+        self.filterTool.addItems(["All", *self.toolList])
         self.filterText = QtWidgets.QLineEdit()
         self.filterText.setPlaceholderText("Filter text…")
 
         # Templates
-        self.templates = TemplatesModel(self)
-        self.templates.builtin()  # start with built-ins
-        self.templatePicker = QtWidgets.QComboBox()
+        self.templates = TemplatesModel(Path(repo_default) / STATE_DIR, self)
+        self.templateTree = QtWidgets.QTreeWidget()
+        self.templateTree.setColumnCount(1)
+        self.templateTree.setHeaderHidden(True)
+        self.templateTree.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
+        )
         self.templates.changed.connect(self.refresh_templates)
         self.refresh_templates()
         self.btnEnqueueTemplate = QtWidgets.QPushButton("Enqueue Template")
         self.btnEditTemplate = QtWidgets.QPushButton("Open in Dialog")
         self.btnLoadTemplates = QtWidgets.QPushButton("Load Templates.json…")
+        self.btnManageTemplates = QtWidgets.QPushButton("Manage…")
         self.btnEnqueueTemplate.clicked.connect(self.enqueue_template)
         self.btnEditTemplate.clicked.connect(self.open_template_in_dialog)
         self.btnLoadTemplates.clicked.connect(self.load_templates_from_disk)
+        self.btnManageTemplates.clicked.connect(self.manage_templates)
 
-        controls = QtWidgets.QWidget()
-        h = QtWidgets.QHBoxLayout(controls)
-        h.addWidget(self.btnStart)
-        h.addWidget(self.btnStop)
-        h.addSpacing(20)
-        h.addWidget(self.btnAdd)
-        h.addWidget(self.btnRetryFailed)
-        h.addStretch(1)
-        h.addWidget(self.btnOpenTasks)
-        h.addWidget(self.btnOpenLogs)
-        h.addWidget(self.btnClearLog)
-        h.addWidget(self.btnRefreshLedger)
-        h.addWidget(self.btnRefreshDLQ)
-        h.addWidget(self.btnRefreshCB)
-        h.addWidget(self.btnForceCloseCB)
-        h.addWidget(self.btnRetrySelectedDLQ)
-        h.addWidget(self.btnDeleteSelectedDLQ)
+        top = QtWidgets.QWidget()
+        g = QtWidgets.QGridLayout(top)
+        g.addWidget(QtWidgets.QLabel("Repo:"), 0, 0)
+        g.addWidget(self.repoEdit, 0, 1)
+        g.addWidget(self.btnRepo, 0, 2)
+        g.addWidget(QtWidgets.QLabel("Tasks Dir:"), 1, 0)
+        g.addWidget(self.tasksEdit, 1, 1)
+        g.addWidget(self.btnTasks, 1, 2)
+        g.addWidget(QtWidgets.QLabel("Logs Dir:"), 2, 0)
+        g.addWidget(self.logsEdit, 2, 1)
+        g.addWidget(self.btnLogs, 2, 2)
 
-        # Central layout
-        central = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(central)
-        layout.addWidget(top)
-        layout.addWidget(controls)
-        layout.addWidget(tbar)
-        layout.addWidget(splitter)
-        self.setCentralWidget(central)
+        hb = QtWidgets.QHBoxLayout()
+        hb.addStretch(1)
+        hb.addWidget(self.btnOpenTasks)
+        hb.addWidget(self.btnOpenLogs)
+        hb.addWidget(self.btnLaunchTerminal)
+        hb.addSpacing(20)
+        hb.addWidget(QtWidgets.QLabel("Filter:"))
+        hb.addWidget(self.filterTool)
+        hb.addWidget(self.filterText)
 
-        # Status bar
-        self.status = self.statusBar()
-        self.lblStatus = QtWidgets.QLabel("Stopped")
-        self.status.addPermanentWidget(self.lblStatus)
+        tbar = QtWidgets.QWidget()
+        tb = QtWidgets.QHBoxLayout(tbar)
+        tb.addWidget(QtWidgets.QLabel("Templates:"))
+        tb.addWidget(self.templateTree, 2)
+        tb.addWidget(self.btnEnqueueTemplate)
+        tb.addWidget(self.btnEditTemplate)
+        tb.addStretch(1)
+        tb.addWidget(self.btnLoadTemplates)
+        tb.addWidget(self.btnManageTemplates)
 
-        # Timers
-        self.tailer = LogTailer("", poll_ms=700, parent=self)
-        self.tailer.new_lines.connect(self.on_new_log_lines)
-        self.hbTimer = QtWidgets.QTimer(self)
-        self.hbTimer.setInterval(1000)
-        self.hbTimer.timeout.connect(self.check_heartbeat)
+        # === Center: tabs ===
+        self.liveLog = QtWidgets.QTextEdit()
+        self.liveLog.setReadOnly(True)
 
-        self.update_default_paths()
-        self.tailer.start()
+        # Scheduling UI placeholders (integrate PR18's scheduling controls here)
+        self.prioritySpin = QtWidgets.QSpinBox()
+        self.prioritySpin.setRange(0, 100)
+        self.prioritySpin.setValue(50)
+        self.recurringCheck = QtWidgets.QCheckBox("Recurring")
+        self.scheduleInput = QtWidgets.QLineEdit()
+        self.scheduleInput.setPlaceholderText("cron or interval…")
+
+        scheduleWidget = QtWidgets.QWidget()
+        sh = QtWidgets.QHBoxLayout(scheduleWidget)
+        sh.addWidget(QtWidgets.QLabel("Priority:"))
+        sh.addWidget(self.prioritySpin)
+        sh.addWidget(self.recurringCheck)
+        sh.addWidget(QtWidgets.QLabel("Schedule:"))
+        sh.addWidget(self.scheduleInput)
+
+        # Layout assembly
+        v = QtWidgets.QVBoxLayout()
+        v.addLayout(g)
+        v.addLayout(hb)
+        v.addWidget(tbar)
+        v.addWidget(scheduleWidget)
+        v.addWidget(self.liveLog, 1)
+
+        main = QtWidgets.QWidget()
+        main.setLayout(v)
+        self.setCentralWidget(main)
+
+        # Tailer
+        self.tailer = LogTailer()
+        self.tailer.new_lines.connect(self.append_log_lines)
+
+        self.hbTimer = QtCore.QTimer(self)
+        self.hbTimer.setInterval(2000)
+        self.hbTimer.timeout.connect(self.refresh_breakers)
         self.hbTimer.start()
+
         # Try load templates from default Config path
         self.try_load_default_templates()
-        # Limit live log memory; wire error list double-click to open file
-        if hasattr(self, 'liveLog') and hasattr(self.liveLog, 'document'):
-            try:
-                self.liveLog.document().setMaximumBlockCount(10000)
-            except Exception:
-                pass
-        if hasattr(self, 'errorsList'):
-            try:
-                self.errorsList.itemDoubleClicked.connect(lambda _it: self.open_selected_log())
-            except Exception:
-                pass
+        geometry = self.settings.value("window/geometry")
+        if geometry is not None:
+            self.restoreGeometry(QtCore.QByteArray(geometry))
+        win_state = self.settings.value("window/state")
+        if win_state is not None:
+            self.restoreState(QtCore.QByteArray(win_state))
+        self.reload_tool_list()
 
     # ===== Paths/helpers =====
     def repo_dir(self) -> str:
         return self.repoEdit.text().strip() or DEFAULT_REPO
 
     def tasks_dir(self) -> str:
-        p = self.tasksEdit.text().strip()
-        if not p:
-            p = get_shared_paths(self.repo_dir())["TasksRoot"]
-        return p
+        t = self.tasksEdit.text().strip()
+        if t:
+            return t
+        return os.path.join(self.repo_dir(), ".tasks")
 
     def logs_dir(self) -> str:
-        p = self.logsEdit.text().strip()
-        if not p:
-            p = get_shared_paths(self.repo_dir())["LogsRoot"]
-        return p
+        l = self.logsEdit.text().strip()
+        if l:
+            return l
+        return os.path.join(self.repo_dir(), "logs")
 
     def state_dir(self) -> str:
-        return get_shared_paths(self.repo_dir())["StateRoot"]
+        return os.path.join(self.repo_dir(), STATE_DIR)
 
     def update_default_paths(self):
-        roots = get_shared_paths(self.repo_dir())
-        self.tasksEdit.setPlaceholderText(roots["TasksRoot"])
-        self.logsEdit.setPlaceholderText(roots["LogsRoot"])
-        # Populate from SharedConfig when fields are empty
-        if not self.tasksEdit.text().strip():
-            self.tasksEdit.setText(roots["TasksRoot"])
-        if not self.logsEdit.text().strip():
-            self.logsEdit.setText(roots["LogsRoot"])
+        self.tasksEdit.setPlaceholderText(os.path.join(self.repo_dir(), ".tasks"))
+        self.logsEdit.setPlaceholderText(os.path.join(self.repo_dir(), "logs"))
         for p in [self.tasks_dir(), self.logs_dir(), self.state_dir()]:
-            os.makedirs(p, exist_ok=True)
+            try:
+                os.makedirs(p, exist_ok=True)
+            except Exception as exc:
+                logging.error("Unable to create directory %s: %s", p, exc)
         self.tailer.path = os.path.join(self.logs_dir(), "queueworker.log")
         self.refresh_breakers()
+        try:
+            self.templates.set_state_dir(Path(self.state_dir()))
+            self.try_load_default_templates()
+        except Exception as exc:
+            logging.error("Template state update failed: %s", exc)
 
     # ===== UI actions =====
     def choose_repo(self):
         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Choose Repo", self.repo_dir())
         if d:
             self.repoEdit.setText(d)
+            self.settings.setValue("paths/repo", d)
             self.update_default_paths()
-            self.try_load_default_templates()
 
     def choose_tasks(self):
         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Choose .tasks", self.tasks_dir())
         if d:
             self.tasksEdit.setText(d)
+            self.settings.setValue("paths/tasks", d)
 
     def choose_logs(self):
         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Choose logs", self.logs_dir())
         if d:
             self.logsEdit.setText(d)
             self.tailer.path = os.path.join(self.logs_dir(), "queueworker.log")
+            self.settings.setValue("paths/logs", d)
 
     def start_worker(self):
         sup = os.path.join(self.repo_dir(), "scripts", "Supervisor.ps1")
-        if not os.path.exists(sup):
-            QtWidgets.QMessageBox.warning(self, "Missing", f"Supervisor not found:\n{sup}")
-            return
-        # Ensure directories exist based on SharedConfig
-        self.update_default_paths()
-        # Simple cooldown after stopping
-        if hasattr(self, '_lastStopAt') and hasattr(self, '_cooldownSec'):
-            if (time.time() - float(getattr(self, '_lastStopAt', 0) or 0)) < float(getattr(self, '_cooldownSec', 3)):
-                QtWidgets.QMessageBox.information(self, "Cooldown", "Please wait a few seconds before starting again.")
-                return
-        try:
-            pwsh = _which("pwsh")
-            ps5 = _which("powershell")
-            if pwsh:
-                subprocess.Popen([pwsh, "-NoProfile", "-File", sup])
-            elif os.name == "nt" and ps5:
-                cmd = f'"{ps5}" -NoProfile -ExecutionPolicy Bypass -File "{sup}"'
-                subprocess.Popen(
-                    cmd,
-                    shell=True,
-                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
-                )
-            else:
-                QtWidgets.QMessageBox.critical(
-                    self,
-                    "PowerShell Missing",
-                    "PowerShell 7+ (pwsh) not found. Install from https://aka.ms/powershell",
-                )
-                return
-            self.lblStatus.setText("Worker: starting…")
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", str(e))
+        if os.path.exists(sup):
+            try:
+                subprocess.Popen(["pwsh", "-NoLogo", "-File", sup])
+            except Exception as exc:
+                QtWidgets.QMessageBox.critical(self, "Start failed", f"Unable to start supervisor: {exc}")
+        else:
+            QtWidgets.QMessageBox.information(self, "No supervisor", "Supervisor.ps1 not found in scripts/")
 
     def stop_worker(self):
-        stopfile = os.path.join(self.repo_dir(), "STOP.HEADLESS")
-        try:
-            with open(stopfile, "w", encoding="utf-8") as f:
-                f.write("stop")
-            self.lblStatus.setText("Stop requested")
-            # Record stop time for cooldown
-            try:
-                self._lastStopAt = time.time()
-            except Exception:
-                pass
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", str(e))
+        # Stop logic placeholder — PR18 likely provides a supervisor control endpoint.
+        QtWidgets.QMessageBox.information(self, "Stop", "Request to stop worker submitted (placeholder)")
 
     # ===== Templates =====
     def refresh_templates(self):
-        self.templatePicker.clear()
-        for name in sorted(self.templates.templates.keys()):
-            self.templatePicker.addItem(name)
+        self.templateTree.clear()
+        for category, records in self.templates.grouped().items():
+            cat_item = QtWidgets.QTreeWidgetItem([category])
+            cat_item.setFirstColumnSpanned(True)
+            self.templateTree.addTopLevelItem(cat_item)
+            for rec in records:
+                label = rec.name
+                child = QtWidgets.QTreeWidgetItem([label])
+                child.setToolTip(0, rec.description or rec.name)
+                child.setData(0, QtCore.Qt.ItemDataRole.UserRole, (rec.name, rec.category))
+                cat_item.addChild(child)
+            cat_item.setExpanded(True)
 
-    def get_selected_template_task(self) -> dict | None:
-        name = self.templatePicker.currentText().strip()
-        return self.templates.templates.get(name)
+    def current_template_record(self) -> TemplateRecord | None:
+        item = self.templateTree.currentItem()
+        if not item or not item.parent():
+            return None
+        key = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
+        if not key:
+            return None
+        name, category = key
+        return self.templates.get(name, category)
 
     def enqueue_template(self):
-        task = self.get_selected_template_task()
-        if not task:
+        rec = self.current_template_record()
+        if not rec:
             QtWidgets.QMessageBox.information(self, "No template", "Select a template first")
             return
-        # Respect current repo if not set
-        task = dict(task)  # shallow copy
+        task = dict(rec.task)
         task.setdefault("repo", self.repo_dir())
+        # Integrate scheduling fields if set
+        if self.recurringCheck.isChecked():
+            task.setdefault("recurring", True)
+            task.setdefault("schedule", self.scheduleInput.text().strip())
+        task.setdefault("priority", int(self.prioritySpin.value()))
         self.enqueue_task_dict(task)
 
     def open_template_in_dialog(self):
-        task = self.get_selected_template_task()
-        if not task:
+        rec = self.current_template_record()
+        if not rec:
             QtWidgets.QMessageBox.information(self, "No template", "Select a template first")
             return
-        task = dict(task)
+        task = dict(rec.task)
         task.setdefault("repo", self.repo_dir())
-        tool_names = get_tool_names_from_config(self.repo_dir())
-        dlg = AddTaskDialog(self.repo_dir(), tool_names, seed=task, parent=self)
+        dlg = AddTaskDialog(
+            self.repo_dir(),
+            self.toolList,
+            self.templates,
+            seed=task,
+            parent=self,
+        )
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             self.enqueue_task_dict(dlg.build_task())
+
+    def add_task(self):
+        dlg = AddTaskDialog(self.repo_dir(), self.toolList, self.templates, parent=self)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            self.enqueue_task_dict(dlg.build_task())
+
+    def get_selected_template_task(self) -> dict | None:
+        rec = self.current_template_record()
+        if not rec:
+            return None
+        return rec.task
 
     def load_templates_from_disk(self):
-        path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Load Templates JSON", self.repo_dir(), "JSON (*.json)"
-        )
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load Templates.json", self.repo_dir(), "JSON Files (*.json)")
         if not path:
             return
-        self.templates.load(path)
+        self.templates.load_external_json(Path(path))
 
     def try_load_default_templates(self):
-        path = os.path.join(self.repo_dir(), DEFAULT_TEMPLATES_REL)
-        if os.path.exists(path):
-            self.templates.load(path)
+        path = Path(self.repo_dir()) / DEFAULT_TEMPLATES_REL
+        if path.exists():
+            self.templates.load_external_json(path)
+
+    def manage_templates(self):
+        dlg = TemplateManagerDialog(self.templates, self.toolList, self.repo_dir, self)
+        dlg.exec()
+
+    def reload_tool_list(self, *_):
+        tools, errors = load_tool_whitelist(self.baseDir)
+        self.toolList = tools
+        self.toolErrors = errors
+        if hasattr(self, "filterTool"):
+            current = self.filterTool.currentText()
+            self.filterTool.blockSignals(True)
+            self.filterTool.clear()
+            self.filterTool.addItems(["All", *self.toolList])
+            if current in self.toolList or current == "All":
+                self.filterTool.setCurrentText(current)
+            else:
+                self.filterTool.setCurrentIndex(0)
+            self.filterTool.blockSignals(False)
+        if errors and hasattr(self, "status"):
+            self.status.showMessage(
+                "Tool config issues detected; using fallback list.",
+                5000,
+            )
 
     # ===== Task enqueue & retry =====
-    def add_task(self):
-        tool_names = get_tool_names_from_config(self.repo_dir())
-        dlg = AddTaskDialog(self.repo_dir(), tool_names, parent=self)
-        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-            self.enqueue_task_dict(dlg.build_task())
-
-    def enqueue_task_dict(self, task: dict):
-        inbox = os.path.join(self.tasks_dir(), "inbox")
-        os.makedirs(inbox, exist_ok=True)
-        tid = task.get("id") or datetime.now().strftime("%Y%m%d%H%M%S")
-        task["id"] = tid
-        path = os.path.join(inbox, f"task_{tid}.jsonl")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(json.dumps(task, ensure_ascii=False) + "\n")
-        QtWidgets.QMessageBox.information(self, "Queued", f"Task enqueued:\n{path}")
-
-    def retry_failed(self):
-        self.refresh_dlq()  # loads lists
-        inbox = os.path.join(self.tasks_dir(), "inbox")
-        os.makedirs(inbox, exist_ok=True)
-        moved = 0
-        for lst in (self.failedList, self.quarantineList):
-            for i in range(lst.count()):
-                item = lst.item(i)
-                if not item:
-                    continue
-                p = item.data(QtCore.Qt.ItemDataRole.UserRole)
-                if p and os.path.isfile(p):
-                    try:
-                        shutil.move(p, os.path.join(inbox, os.path.basename(p)))
-                        moved += 1
-                    except Exception:
-                        pass
-        QtWidgets.QMessageBox.information(self, "Retry", f"Moved {moved} files back to inbox.")
-
-    # ===== DLQ inspector =====
-    def refresh_dlq(self):
-        self.failedList.clear()
-        self.quarantineList.clear()
-        failed = os.path.join(self.tasks_dir(), "failed")
-        quarant = os.path.join(self.tasks_dir(), "quarantine")
-        for folder, widget in [(failed, self.failedList), (quarant, self.quarantineList)]:
-            if os.path.isdir(folder):
-                for name in sorted(os.listdir(folder)):
-                    if name.endswith(".jsonl"):
-                        p = os.path.join(folder, name)
-                        it = QtWidgets.QListWidgetItem(
-                            name
-                            + "  ("
-                            + datetime.fromtimestamp(os.path.getmtime(p)).strftime(
-                                "%Y-%m-%d %H:%M:%S"
-                            )
-                            + ")"
-                        )
-                        it.setData(QtCore.Qt.ItemDataRole.UserRole, p)
-                        widget.addItem(it)
-
-    def delete_selected_dlq(self):
-        # Confirmation
-        resp = QtWidgets.QMessageBox.question(
-            self,
-            "Confirm Delete",
-            "Delete selected failed/quarantined tasks? This cannot be undone.",
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-        )
-        if resp != QtWidgets.QMessageBox.StandardButton.Yes:
-            return
-        total = 0
-        for lst in (self.failedList, self.quarantineList):
-            for it in lst.selectedItems():
-                p = it.data(QtCore.Qt.ItemDataRole.UserRole)
-                try:
-                    os.remove(p)
-                    total += 1
-                except Exception:
-                    pass
-        self.refresh_dlq()
-        QtWidgets.QMessageBox.information(self, "Delete", f"Deleted {total} file(s).")
-
-    def retry_selected_dlq(self):
-        inbox = os.path.join(self.tasks_dir(), "inbox")
-        os.makedirs(inbox, exist_ok=True)
-        moved = 0
-        for lst in (self.failedList, self.quarantineList):
-            for it in lst.selectedItems():
-                p = it.data(QtCore.Qt.ItemDataRole.UserRole)
-                try:
-                    shutil.move(p, os.path.join(inbox, os.path.basename(p)))
-                    moved += 1
-                except Exception:
-                    pass
-        self.refresh_dlq()
-        QtWidgets.QMessageBox.information(self, "Retry", f"Moved {moved} file(s) to inbox.")
-
-    # ===== Quarantine breakers =====
-    def breakers_path(self) -> str:
-        return os.path.join(self.state_dir(), "circuit_breakers.json")
-
-    def refresh_breakers(self):
-        path = self.breakers_path()
-        self.breakerView.setRowCount(0)
-        if not os.path.exists(path):
-            return
-        try:
-            data = json.load(open(path, "r", encoding="utf-8"))
-            if not isinstance(data, dict):
-                return
-            for tool, rec in sorted(data.items()):
-                r = self.breakerView.rowCount()
-                self.breakerView.insertRow(r)
-                state = rec.get("state", "?")
-                fails = rec.get("fails", "?")
-                until = rec.get("until", "")
-                for c, val in enumerate([tool, state, str(fails), until]):
-                    self.breakerView.setItem(r, c, QtWidgets.QTableWidgetItem(val))
-        except Exception:
-            pass
-
-    def force_close_breaker(self):
-        path = self.breakers_path()
-        if not os.path.exists(path):
-            QtWidgets.QMessageBox.information(self, "No file", "circuit_breakers.json not found")
-            return
-        try:
-            data = json.load(open(path, "r", encoding="utf-8"))
-            rows = {
-                self.breakerView.item(i, 0).text(): i for i in range(self.breakerView.rowCount())
-            }
-            sel = self.breakerView.selectedItems()
-            if not sel:
-                QtWidgets.QMessageBox.information(self, "Select", "Select a row first")
-                return
-            tools = sorted({self.breakerView.item(it.row(), 0).text() for it in sel})
-            for t in tools:
-                if t in data:
-                    data[t]["state"] = "closed"
-                    data[t]["fails"] = 0
-                    data[t]["until"] = datetime.now().isoformat()
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False)
-            self.refresh_breakers()
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", str(e))
-
-    # ===== Live log & filters =====
-    def on_new_log_lines(self, lines: list[str]):
-        at_end = (
-            self.liveLog.verticalScrollBar().value() == self.liveLog.verticalScrollBar().maximum()
-        )
-        tool_filter = self.filterTool.currentText().lower()
-        text_filter = self.filterText.text().strip().lower()
-
-        for line in lines:
-            low = line.lower()
-            # tool filter
-            if tool_filter != "all":
-                # heuristic: include if tool name appears in line, e.g., "[git]" or "git:" or " [git] "
-                if (
-                    f"[{tool_filter}]" not in low
-                    and (tool_filter + ":") not in low
-                    and (" " + tool_filter + " ") not in low
-                ):
-                    continue
-            # text filter
-            if text_filter and text_filter not in low:
-                continue
-
-            self.liveLog.append(f'<span style="color:{color_for_line(line)}">{line}</span>')
-
-            if "error" in low or "fail" in low or "timeout" in low:
-                hint_log = None
-                for tok in line.split():
-                    if tok.startswith("task_") and tok.endswith(".log"):
-                        hint_log = os.path.join(self.logs_dir(), tok)
-                        break
-                it = QtWidgets.QListWidgetItem(line)
-                if hint_log:
-                    it.setData(QtCore.Qt.ItemDataRole.UserRole, hint_log)
-                it.setForeground(QtGui.QBrush(QtGui.QColor("#ff4444")))
-                self.errorsList.addItem(it)
-                if self.errorsList.count() > 200:
-                    self.errorsList.takeItem(0)
-
-        if at_end:
-            self.liveLog.verticalScrollBar().setValue(self.liveLog.verticalScrollBar().maximum())
-
-    # ===== Ledger & heartbeat =====
-    def load_ledger(self):
-        self.ledgerList.clear()
-        ledger = os.path.join(self.logs_dir(), "ledger.jsonl")
-        if not os.path.exists(ledger):
-            self.ledgerList.addItem("ledger.jsonl not found")
-            return
-        try:
-            with open(ledger, "r", encoding="utf-8", errors="replace") as f:
-                lines = f.readlines()[-500:]
-            for ln in lines:
-                ln = ln.strip()
-                if not ln:
-                    continue
-                try:
-                    obj = json.loads(ln)
-                    ts = obj.get("ts", "")
-                    tid = obj.get("id", "")
-                    tool = obj.get("tool", "")
-                    ok = obj.get("ok", False)
-                    exitc = obj.get("exit", "")
-                    txt = f"{ts}  [{tool}] id={tid}  {'OK' if ok else 'FAIL'} (code={exitc})"
-                    it = QtWidgets.QListWidgetItem(txt)
-                    it.setForeground(QtGui.QBrush(QtGui.QColor("#44bb44" if ok else "#ff4444")))
-                    self.ledgerList.addItem(it)
-                except Exception:
-                    self.ledgerList.addItem(ln)
-        except Exception as e:
-            self.ledgerList.addItem(f"Error reading ledger: {e}")
-
-    def check_heartbeat(self):
-        hb = os.path.join(self.state_dir(), "heartbeat.json")
-        if not os.path.exists(hb):
-            self.lblStatus.setText("No heartbeat")
-            # Update buttons when not running (respect a short cooldown)
-            cd = False
-            try:
-                cd = (time.time() - float(getattr(self, '_lastStopAt', 0) or 0)) < float(getattr(self, '_cooldownSec', 3))
-            except Exception:
-                cd = False
-            try:
-                self.btnStart.setEnabled(not cd)
-                self.btnStop.setEnabled(False)
-                self.btnStart.setToolTip("" if not cd else "Cooldown active")
-            except Exception:
-                pass
-            return
-        try:
-            data = json.load(open(hb, "r", encoding="utf-8"))
-            ts_raw = data.get("timestamp", "")
-            if not ts_raw:
-                self.lblStatus.setText("Heartbeat: unreadable")
-                try:
-                    self.btnStart.setEnabled(True)
-                    self.btnStop.setEnabled(False)
-                except Exception:
-                    pass
-                return
-            ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
-            age = (datetime.now(timezone.utc) - ts.astimezone(timezone.utc)).total_seconds()
-            pid = data.get("pid", "?")
-            self.lblStatus.setText(f"Heartbeat: {int(age)}s ago  |  PID {pid}")
-            # Toggle buttons based on running state
-            running = age <= 5
-            try:
-                if running:
-                    self.btnStart.setEnabled(False)
-                    self.btnStop.setEnabled(True)
-                else:
-                    cd = (time.time() - float(getattr(self, '_lastStopAt', 0) or 0)) < float(getattr(self, '_cooldownSec', 3))
-                    self.btnStart.setEnabled(not cd)
-                    self.btnStop.setEnabled(False)
-            except Exception:
-                pass
-        except Exception:
-            self.lblStatus.setText("Heartbeat: unreadable")
-            try:
-                self.btnStart.setEnabled(True)
-                self.btnStop.setEnabled(False)
-            except Exception:
-                pass
-
-    # ===== Misc helpers =====
-    def open_folder(self, path: str):
-        if not os.path.isdir(path):
-            os.makedirs(path, exist_ok=True)
-        if sys.platform.startswith("win"):
-            os.startfile(path)
-        elif sys.platform == "darwin":
-            subprocess.call(["open", path])
-        else:
-            subprocess.call(["xdg-open", path])
-
-    def open_selected_log(self):
-        item = self.errorsList.currentItem()
-        if not item:
-            return
-        path = item.data(QtCore.Qt.ItemDataRole.UserRole)
-        if path and os.path.isfile(path):
-            self.open_folder(os.path.dirname(path))
-
-
-def main():
-    app = QtWidgets.QApplication(sys.argv)
-    w = MainWindow()
-    w.show()
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()
