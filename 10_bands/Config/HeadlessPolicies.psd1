@@ -4,6 +4,7 @@
     HeartbeatEverySeconds          = 5
     LogRotateMaxMB                 = 32
     LogKeepDays                    = 14
+    MaxConcurrentTasks             = 3
   }
 
   Retry = @{

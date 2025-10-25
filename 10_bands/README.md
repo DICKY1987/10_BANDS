@@ -120,6 +120,12 @@ wt -p "10_Bands" --fullscreen
 .\Modules\Update-WTProfile.ps1 -Repo "D:\MyProject" -ProfileName "MyProject_10Bands"
 ```
 
+### Automation Integrations
+- `scripts/TaskWebhook.ps1` – lightweight HTTP endpoint for remote task enqueueing.
+- `scripts/TaskFileWatcher.ps1` – enqueue tasks when files change.
+- `tools/git-hooks/post-commit.ps1` – sample Git hook to trigger tasks after commits.
+- See `docs/CI_INTEGRATION.md` for Jenkins/GitHub Actions examples.
+
 ### Enable Persisted Layout (Auto-Save)
 ```powershell
 # Enables automatic layout saving/restoration
